@@ -2,7 +2,7 @@
 """
 Created on Thu Jun 25 14:25:43 2020
 
-Real Time Stabilization Program
+Real Time Stabilization Simulator
 
 Using Euler Angles
 
@@ -55,7 +55,7 @@ In future, will be imported from a local file, but for now are just created.
 max_motor_thrust = 40 # N
 max_motor_speed = 30 # rad/s
 motor_mass = 0.1
-
+motor_tau = 0.2 # s
 #%%###########################
 
 # Object Definitions
@@ -72,7 +72,6 @@ class Motor():
     
     def __init__(self, thrust_max, omega_max, motor_mass,\
                  motor_type = 'CW', thrust_curve = 'linear'):
-        
         """
         
         Defines motor properties
@@ -95,6 +94,7 @@ class Motor():
 
         """
         
+        self.tau = motor_tau
         self.thrust_max = thrust_max
         self.omega_max = omega_max
         self.motor_mass = motor_mass
@@ -108,14 +108,17 @@ class Motor():
                                   [0],
                                   [0]])
         
+        self.motor_torque = np.array([[0],
+                                      [0],
+                                      [0]])
+
         if thrust_curve == 'linear':
             self.motor_const = self.thrust_max / self.omega_max
         
         self.force_b = np.array([[0],
-                               [0],
-                               [0]])
+                                 [0],
+                                 [0]])
     def InToOut(self, input_param):
-        
         """
         A function to update motor properties based on input signal.
 
@@ -129,12 +132,17 @@ class Motor():
         None.
 
         """
+        self.ForceFind(input_param)    
+        self.PropertyCheck()
+        self.ForceUpdate()
+
+    def ForceFind(self, input_param):
+        
+        
         self.omega = (input_param / signal_width) * self.omega_max
         self.thrust = self.motor_const*self.omega
         
-        self.PropertyCheck()
-        self.ForceUpdate()
-        
+
     def PropertyCheck(self):
         """
         Reality check for motor properties.
@@ -148,10 +156,19 @@ class Motor():
         """
         if self.thrust > self.thrust_max:
             self.thrust = self.thrust_max
-        if self.omega > self.omega_max:
-            self.omega = self.omega_max
+        elif self.thrust < 0:
+            self.thrust = 0
         else:
             pass
+        
+        
+        if self.omega > self.omega_max:
+            self.omega = self.omega_max
+        elif self.omega < 0:
+            self.omega = 0
+        else:
+            pass
+        
     def ForceUpdate(self):
         self.force_b = np.array([[0],
                                  [0],
@@ -323,6 +340,9 @@ class UAV():
     def MotorForces(self):
         pass
     
+    def MotorTorques(self):
+        pass
+    
     def NewtonsKinematics(self):
         
         # Note: += doesn't work for arrays for some weird reason
@@ -331,12 +351,17 @@ class UAV():
         self.pos_e = self.vel_e*dt + self.pos_e
         # print(self.pos_e)
         
+    def NewtonsRotational(self):
+        pass
+    
     def ForceAddition(self):
         pass
     
     def Update(self):
         self.MotorForces()
+        self.TorqueAddition()
         self.ForceAddition()
+        self.NewtonsRotational()
         self.NewtonsKinematics()
         self.RecordData()
 
@@ -466,7 +491,16 @@ class QuadX(UAV):
                         + self.motor_3.force_b)
         
         # Include created moments here too
-        
+    
+    def MotorTorques(self):
+        self.motor_0.motor_torque = np.cross(self.motor_0.position,\
+                                             self.motor_0.force_b,axis=0)
+        self.motor_1.motor_torque = np.cross(self.motor_1.position,\
+                                             self.motor_1.force_b,axis=0)
+        self.motor_2.motor_torque = np.cross(self.motor_2.position,\
+                                             self.motor_2.force_b,axis=0)
+        self.motor_3.motor_torque = np.cross(self.motor_3.position,\
+                                             self.motor_3.force_b,axis=0)
         
     def ForceAddition(self):
         self.force_e = BodyToEarth(self.force_b, self)
@@ -474,6 +508,12 @@ class QuadX(UAV):
         
         # Include sum of moments here too
     
+    def TorqueAddition(self):
+        self.total_torque = (self.motor_0.motor_torque
+                             + self.motor_1.motor_torque
+                             + self.motor_2.motor_torque
+                             + self.motor_3.motor_torque)
+        
     def IncreaseThrust(self):
         self.signal += 1
     
@@ -674,26 +714,26 @@ def plothus(ax, x, y, datalabel = ''):
 
 drone = QuadX(0.25, 5)
 
-while drone.time < 5:
-    drone.Stabilize()
-    drone.time += dt
-    print(drone.pos_e[2])
-    print(drone.signal)
-#%%###########################
+# while drone.time < 5:
+#     drone.Stabilize()
+#     drone.time += dt
+#     print(drone.pos_e[2])
+#     print(drone.signal)
+# #%%###########################
 
-# Plotting results
-fig, zplot = plt.subplots()
-plothusly(zplot, drone.df["Time"], drone.df["Z Position"], "Time in seconds",\
-          "Z position in metres", "Drone 1", "Z positions")
+# # Plotting results
+# fig, zplot = plt.subplots()
+# plothusly(zplot, drone.df["Time"], drone.df["Z Position"], "Time in seconds",\
+#           "Z position in metres", "Drone 1", "Z positions")
 
-fig, zvelplot = plt.subplots()
-plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
-          "Z velocity in metres/s", "Drone 1", "Z Velocity")
+# fig, zvelplot = plt.subplots()
+# plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
+#           "Z velocity in metres/s", "Drone 1", "Z Velocity")
 
-fig, zaccplot = plt.subplots()
+# fig, zaccplot = plt.subplots()
 
-plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
-          "Z velocity in metres/s", "Drone 1", "Z Acceleration")
+# plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
+#           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
-fig, signalplot = plt.subplots()
-plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Thrust"], "Time", "Motor 0 Thrust", "Motor 0", "Thrust")
+# fig, signalplot = plt.subplots()
+# plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Thrust"], "Time", "Motor 0 Thrust", "Motor 0", "Thrust")
