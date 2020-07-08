@@ -21,7 +21,9 @@ import numpy as np
 import math as mt
 import pandas as pd
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 plt.style.use('fast')
+
 #%%###########################
 
 # Variable Parameters
@@ -38,11 +40,14 @@ D =     1   # unitless
 
 # System Constants
 
-signal_width = 10000 # Width of servo signal channel
+signal_width = 100 # Width of servo signal channel
 initial_dt = 1E-3 # Starting dt constant
+
+grav_const = 9.805 # m*s**-2
+
 acc_grav = np.array([[0],
                      [0],
-                     [9.81]])
+                     [1]]) * grav_const
 dt = initial_dt
 #%%###########################
 
@@ -172,7 +177,7 @@ class Motor():
     def ForceUpdate(self):
         self.force_b = np.array([[0],
                                  [0],
-                                 [-1*self.thrust]])
+                                 [-1]]) * self.thrust
     def PositionFix(self, x_b, y_b, z_b):
         """
         Function called to easily fix motor position in reference to
@@ -231,7 +236,7 @@ class UAV():
         self.radius = radius
         self.mass = mass
         
-        # Kinematic properties in body axis
+        # Linear kinematic properties in body axis
         
         self.acc_b = np.array([[0],
                                [0],
@@ -245,7 +250,7 @@ class UAV():
                                [0],
                                [0]])
         
-        # Kinematic properties in Earth Axis
+        # Linear kinematic properties in Earth Axis
         self.acc_e = np.array([[0],
                                [0],
                                [0]])
@@ -276,6 +281,28 @@ class UAV():
         self.force_aero = np.array([[0],
                                     [0],
                                     [0]])
+        
+        # Rotational Kinematic properties
+        
+        # Placeholder values, fix these
+        self.I_1 = 0.1
+        self.I_2 = 0.1
+        self.I_3 = 0.1
+        
+        self.angle = np.array([[0],
+                               [0],
+                               [0]])
+
+        
+        self.omega = np.array([[0],
+                               [0],
+                               [0]])
+        
+        self.omega_dot = np.array([[0],
+                                   [0],
+                                   [0]])
+
+        
         
         column_names = ["Time",
                         "X Position"
@@ -321,9 +348,6 @@ class UAV():
         self.roll = roll
         self.pitch = pitch
         self.yaw = yaw
-    
-    def UpdateVelocity(self, x_v, y_v, z_v):
-        pass
 
     def MotorInit(self):
         """
@@ -337,6 +361,26 @@ class UAV():
         """
         pass
     
+    def Update(self):
+        """
+        Function that takes motor outputs, calculates all forces and torques,
+        and updates the physics. Also records data for graphing purposes.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.MotorForces()
+        self.ForceAddition()
+        self.NewtonsKinematics()
+        
+        self.MotorTorques()
+        self.TorqueAddition()
+        self.NewtonsRotational()
+        
+        self.RecordData()
+   
     def MotorForces(self):
         pass
     
@@ -347,23 +391,106 @@ class UAV():
         
         # Note: += doesn't work for arrays for some weird reason
         self.acc_e = self.force_e / self.mass
+        self.pos_e = self.vel_e*dt + self.pos_e + 0.5*self.acc_e*dt**2
         self.vel_e = self.acc_e * dt + self.vel_e
-        self.pos_e = self.vel_e*dt + self.pos_e
         # print(self.pos_e)
         
     def NewtonsRotational(self):
-        pass
+        BodyToEarth(self.total_torque, self)
+        self.AngleCalc()
+        self.AngleCheck()
+    
+    def AngleCalc(self):
+        """
+        Calculates rotational motion using Euler's equations. Uses inertia
+        matrix.
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        # Please note. This is a messy way to do it, but otherwise makes an 
+        # array of arrays. Not ideal, but functional. Should fix later.
+        
+        # Creates local valeus to hold each angle, which are 1x1 arrays
+        x = ((self.total_torque[0] 
+                        -  (self.I_3 - self.I_2)*self.omega[1]*self.omega[2])
+                        / self.I_1)
+        y = ((self.total_torque[1] 
+                        -  (self.I_1 - self.I_3)*self.omega[0]*self.omega[2])
+                        / self.I_2)
+        z = ((self.total_torque[2] 
+                        -  (self.I_2 - self.I_1)*self.omega[1]*self.omega[2])
+                        / self.I_3)
+        
+        # Converts 1x1 arrays into scalars, and places them into the 
+        # angular velocity vector.
+        
+        self.omega_dot = np.array([[x.item()],
+                                 [y.item()],
+                                 [z.item()]])
+        self.angle = (self.angle
+                      + self.omega_dot * 0.5 * dt**2
+                      + self.omega * dt)
+        
+        # print(self.angle)
+        
+        self.omega = (self.omega
+                      + self.omega_dot * dt)
+        
+        self.roll = self.angle[0].item()
+        self.pitch = self.angle[1].item()
+        self.yaw = self.angle[2].item()
+        
+    def AngleCheck(self):
+        """
+        Sanity check for Euler angles.
+        Adjusts angles to remain in bounds
+
+        Returns
+        -------
+        None.
+
+        """
+        check = False
+        if self.yaw > mt.pi:
+            self.yaw -= 2*mt.pi
+            check = True
+        elif self.yaw < -1*mt.pi:
+            self.yaw += 2*mt.pi
+            check = True
+        else:
+            pass
+        
+        if self.pitch > mt.pi:
+            self.pitch -= 2*mt.pi
+            check = True
+        elif self.pitch < -1*mt.pi:
+            self.pitch += 2*mt.pi
+            check = True
+        else:
+            pass
+        
+        if self.roll > mt.pi:
+            self.roll -= 2*mt.pi
+            check = True
+        elif self.roll < -1*mt.pi:
+            self.roll += 2*mt.pi
+            check = True
+        else:
+            pass
+        
+        if check == True:
+            self.angle = np.array([[self.roll],
+                                   [self.pitch],
+                                   [self.yaw]])
+        else:
+            pass
     
     def ForceAddition(self):
         pass
-    
-    def Update(self):
-        self.MotorForces()
-        self.TorqueAddition()
-        self.ForceAddition()
-        self.NewtonsRotational()
-        self.NewtonsKinematics()
-        self.RecordData()
 
     
     
@@ -534,10 +661,10 @@ class QuadX(UAV):
                    "Pitch" : self.pitch,
                    "Roll" : self.roll,
                    "Yaw" : self.yaw,
-                   "Motor 0 Signal" : self.signal[0],
-                   "Motor 1 Signal" : self.signal[1],
-                   "Motor 2 Signal"  : self.signal[2],
-                   "Motor 3 Signal"  : self.signal[3],
+                   "Motor 0 Signal" : self.signal[0].item(),
+                   "Motor 1 Signal" : self.signal[1].item(),
+                   "Motor 2 Signal"  : self.signal[2].item(),
+                   "Motor 3 Signal"  : self.signal[3].item(),
                    "Motor 0 Thrust" : self.motor_0.thrust,
                    "Motor 1 Thrust" : self.motor_1.thrust,
                    "Motor 2 Thrust" : self.motor_2.thrust,
@@ -579,9 +706,9 @@ def YawConv(yaw):
     """
     
     yaw_conv_mat = np.array([
-                          [mt.cos(yaw),     mt.sin(yaw),    0],
-                          [-1*mt.sin(yaw),  mt.cos(yaw),    0],
-                          [0,               0,              1]]
+                            [mt.cos(yaw),     mt.sin(yaw),    0],
+                            [-1*mt.sin(yaw),  mt.cos(yaw),    0],
+                            [0,               0,              1]]
                             )
     return yaw_conv_mat
 
@@ -599,8 +726,8 @@ def PitchConv(pitch):
 
     """
     pitch_conv_mat = np.array([[mt.cos(pitch),     0,  -1*mt.sin(pitch)],
-                            [0,                 1,  0],
-                            [mt.sin(pitch),     0,  mt.cos(pitch)]]
+                               [0,                 1,  0],
+                               [mt.sin(pitch),     0,  mt.cos(pitch)]]
                             )
     return pitch_conv_mat
 
@@ -618,11 +745,10 @@ def RollConv(roll):
 
     """
     
-    roll_conv_mat = np.array([
-                           [1,  0,                  0],
-                           [0,  mt.cos(roll),       mt.sin(roll)],
-                           [0,  -1*mt.sin(roll),    mt.cos(roll)]]
-                           )
+    roll_conv_mat = np.array([[1,  0,                  0],
+                              [0,  mt.cos(roll),       mt.sin(roll)],
+                              [0,  -1*mt.sin(roll),    mt.cos(roll)]]
+                             )
     return roll_conv_mat
 
 def EarthToBody(original_vector, UAV):
@@ -714,17 +840,29 @@ def plothus(ax, x, y, datalabel = ''):
 
 drone = QuadX(0.25, 5)
 
-# while drone.time < 5:
-#     drone.Stabilize()
-#     drone.time += dt
-#     print(drone.pos_e[2])
-#     print(drone.signal)
-# #%%###########################
+while drone.time < 3:
+    drone.Stabilize()
+    drone.time += dt
+    # print(drone.omega_dot)
+    drone.signal[0] = 100
+    drone.signal[1] = 90
+    drone.signal[2] = 95
+    drone.signal[3] = 90
+#%%###########################
 
-# # Plotting results
-# fig, zplot = plt.subplots()
-# plothusly(zplot, drone.df["Time"], drone.df["Z Position"], "Time in seconds",\
-#           "Z position in metres", "Drone 1", "Z positions")
+# Plotting results
+fig, zplot = plt.subplots()
+plothusly(zplot, drone.df["Time"], drone.df["Z Position"], "Time in seconds",\
+          "Z position in metres", "Z Position", "Drone Position")
+plothus(zplot, drone.df["Time"], drone.df["Y Position"], "Y Position")
+plothus(zplot, drone.df["Time"], drone.df["X Position"], "X Position")
+plt.grid()
+plt.legend(loc="best")
+
+
+fig = plt.figure()
+threedplot = fig.add_subplot(111, projection='3d')
+threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
 
 # fig, zvelplot = plt.subplots()
 # plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
@@ -735,5 +873,18 @@ drone = QuadX(0.25, 5)
 # plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
 #           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
-# fig, signalplot = plt.subplots()
-# plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Thrust"], "Time", "Motor 0 Thrust", "Motor 0", "Thrust")
+fig, signalplot = plt.subplots()
+plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
+plt.grid()
+plt.legend(loc="best")
+
+fig, angleplot = plt.subplots()
+plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
+          "Angle from neutral position in radians", "Pitch", "Euler angle plot")
+plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
+plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
+plt.grid()
+plt.legend(loc="best")
