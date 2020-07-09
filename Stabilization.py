@@ -35,6 +35,8 @@ P =     1   # unitless
 I =     1   # unitless
 D =     1   # unitless
 
+angle_conv_const = 0.1
+
 # Drone Properties
 
 #%%###########################
@@ -596,6 +598,40 @@ class UAV():
         None.
 
         """
+    
+    def Stabilize(self):
+        """
+        Calls individual correction functions to compensate for Euler angle
+        instabilities.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.PitchCorrect()
+        self.RollCorrect()
+        self.YawCorrect()
+    
+    
+   
+    def Hover(self):
+        """
+        Hover function.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.vel_e[2] > 0:
+            self.IncreaseThrust()
+        if self.vel_e[2] < 0:
+            self.DecreaseThrust()
+        else:
+            pass
+        self.Update()
+        
         
 class QuadX(UAV):
     """
@@ -776,23 +812,8 @@ class QuadX(UAV):
                    "Motor 2 Thrust" : self.motor_2.thrust,
                    "Motor 3 Thrust" : self.motor_3.thrust}
         self.df = self.df.append(new_row, ignore_index=True)
-   
-    def Stabilize(self):
-        if self.vel_e[2] > 0:
-            self.IncreaseThrust()
-        if self.vel_e[2] < 0:
-            self.DecreaseThrust()
-        else:
-            pass
-        self.Update()
-    
-class test():
-    def __init__(self):
-        pass
 
-class test2():
-    def __init__(self):
-        self.test1 = test()
+
 #%%###########################
 
 # Function Definition
@@ -945,16 +966,16 @@ def plothus(ax, x, y, datalabel = ''):
 # Test Code
 
 drone = QuadX(0.25, 5)
+drone.signal[0] = 0
+drone.signal[1] = 0
+drone.signal[2] = 0
+drone.signal[3] = 0
 
 tic = time.time()
 while drone.time < 3:
     drone.Stabilize()
     drone.time += dt
     # print(drone.omega_dot)
-    drone.signal[0] = 100
-    drone.signal[1] = 90
-    drone.signal[2] = 65
-    drone.signal[3] = 90
 
 toc = time.time()
 
