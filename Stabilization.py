@@ -43,7 +43,7 @@ angle_conv_const = 0.1
 
 # System Constants
 
-signal_width = 100 # Width of servo signal channel
+signal_width = 10000 # Width of servo signal channel
 initial_dt = 1E-3 # Starting dt constant
 
 grav_const = 9.805 # m*s**-2
@@ -396,7 +396,7 @@ class UAV():
         None.
 
         """
-        
+        self.SignalCheck()
         self.MotorForces()
         self.ForceAddition()
         self.NewtonsKinematics()
@@ -612,7 +612,7 @@ class UAV():
         self.PitchCorrect()
         self.RollCorrect()
         self.YawCorrect()
-    
+        self.Update()
     
    
     def Hover(self):
@@ -632,7 +632,31 @@ class UAV():
             pass
         self.Update()
         
+    def PitchCorrect(self):
+        pass
+    
+    def RollCorrect(self):
+        pass
+    
+    def YawCorrect(self):
+        pass
+    
+    def SignalCheck(self):
+        """
+        Sanity check for motor signals.
+
+        Returns
+        -------
+        None.
+
+        """
+        for i in range(len(drone.signal)):
+            if drone.signal[i] > signal_width:
+                drone.signal[i] = signal_width
+            if drone.signal[i] < 0:
+                drone.signal[i] = 0
         
+    
 class QuadX(UAV):
     """
     Perfectly square quadcopter, with motors in X layout.
@@ -768,7 +792,7 @@ class QuadX(UAV):
         self.force_e += self.force_grav + self.force_aero
         
         # Include sum of moments here too
-    
+
     def TorqueAddition(self):
         """
         Sums torques from each motor together.
@@ -812,6 +836,46 @@ class QuadX(UAV):
                    "Motor 2 Thrust" : self.motor_2.thrust,
                    "Motor 3 Thrust" : self.motor_3.thrust}
         self.df = self.df.append(new_row, ignore_index=True)
+    
+    def PitchCorrect(self):
+        if self.pitch > 0:
+            # Can't put them both on the same line, += won't work that way
+            self.signal[0] -= 1
+            self.signal[1] -= 1
+            self.signal[2] += 1
+            self.signal[3] += 1
+            
+            
+        if self.pitch < 0:
+            self.signal[0] += 1
+            self.signal[1] += 1
+            self.signal[2] -= 1
+            self.signal[3] -= 1
+        else:
+            pass
+        
+        print(self.pitch)
+    
+    def RollCorrect(self):
+        
+        if self.roll > 0:
+            # Can't put them both on the same line, += won't work that way
+            self.signal[0] -= 1
+            self.signal[1] += 1
+            self.signal[2] -= 1
+            self.signal[3] += 1
+            
+            
+        if self.roll < 0:
+            self.signal[0] += 1
+            self.signal[1] -= 1
+            self.signal[2] += 1
+            self.signal[3] -= 1
+            
+        else:
+            pass
+        
+        print(self.roll)
 
 
 #%%###########################
@@ -966,7 +1030,7 @@ def plothus(ax, x, y, datalabel = ''):
 # Test Code
 
 drone = QuadX(0.25, 5)
-drone.signal[0] = 0
+drone.signal[0] = 100
 drone.signal[1] = 0
 drone.signal[2] = 0
 drone.signal[3] = 0
