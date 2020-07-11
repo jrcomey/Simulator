@@ -31,9 +31,9 @@ plt.style.use('fast')
 
 # PID Constants
 
-P =     1   # unitless
-I =     1   # unitless
-D =     1   # unitless
+P =     1000  # unitless
+I =     100   # unitless
+D =     10  # Unitless
 
 angle_conv_const = 0.1
 
@@ -43,7 +43,7 @@ angle_conv_const = 0.1
 
 # System Constants
 
-signal_width = 10000 # Width of servo signal channel
+signal_width = 1000 # Width of servo signal channel
 initial_dt = 1E-3 # Starting dt constant
 
 grav_const = 9.805 # m*s**-2
@@ -310,7 +310,7 @@ class UAV():
         
         # Placeholder values, fix these
         self.I_1 = 0.1
-        self.I_2 = 0.5
+        self.I_2 = 0.2
         self.I_3 = 0.1
         
         self.angle = np.array([[0],
@@ -351,6 +351,9 @@ class UAV():
 
         self.MotorInit(max_motor_thrust, max_motor_speed, motor_mass)
         self.time = 0
+        
+        self.prev_pos_err = 0
+        self.int_pos = 0
         
     def UpdateAngle(self, roll, pitch, yaw):
         """
@@ -612,7 +615,7 @@ class UAV():
         self.PitchCorrect()
         self.RollCorrect()
         self.YawCorrect()
-        self.Update()
+        # self.Update()
     
    
     def Hover(self):
@@ -624,13 +627,18 @@ class UAV():
         None.
 
         """
-        if self.vel_e[2] > 0:
-            self.IncreaseThrust()
-        if self.vel_e[2] < 0:
-            self.DecreaseThrust()
-        else:
-            pass
-        self.Update()
+        setpoint_vel = 0
+        err = self.vel_e[2] - setpoint_vel
+        self.int_pos += err*dt
+        der = err - self.prev_pos_err
+        self.signal = np.array([[1],
+                                [1],
+                                [1],
+                                [1]]) * int(P * err + I*self.int_pos + D*der)
+        # print(err)
+        
+        
+        # self.Update()
         
     def PitchCorrect(self):
         pass
@@ -876,6 +884,17 @@ class QuadX(UAV):
             pass
         
         print(self.roll)
+        
+    def HoverFind(self):
+        if self.acc_e[2] < 0.001:
+            self.signal -= 1
+        else:
+            print(self.signal)
+            
+
+    
+    
+            
 
 
 #%%###########################
@@ -1030,14 +1049,16 @@ def plothus(ax, x, y, datalabel = ''):
 # Test Code
 
 drone = QuadX(0.25, 5)
-drone.signal[0] = 100
+drone.signal[0] = 0
 drone.signal[1] = 0
 drone.signal[2] = 0
 drone.signal[3] = 0
 
 tic = time.time()
-while drone.time < 3:
-    drone.Stabilize()
+while drone.time < 5:
+    # drone.Stabilize()
+    drone.Hover()
+    drone.Update()
     drone.time += dt
     # print(drone.omega_dot)
 
@@ -1057,9 +1078,16 @@ plt.grid()
 plt.legend(loc="best")
 
 
-fig = plt.figure()
-threedplot = fig.add_subplot(111, projection='3d')
-threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
+# fig = plt.figure()
+# threedplot = fig.add_subplot(111, projection='3d')
+# threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
+# threedplot.set_xlim(-3, 3)
+# threedplot.set_ylim(-3, 3)
+# threedplot.set_zlim(-10, 0)
+# threedplot.set_xlabel('X Position')
+# threedplot.set_ylabel('Y Position')
+# threedplot.set_zlabel('Z Position')
+
 
 # fig, zvelplot = plt.subplots()
 # plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
@@ -1070,18 +1098,18 @@ threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z P
 # plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
 #           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
-fig, signalplot = plt.subplots()
-plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
-plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
-plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
-plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
-plt.grid()
-plt.legend(loc="best")
+# fig, signalplot = plt.subplots()
+# plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
+# plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
+# plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
+# plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
+# plt.grid()
+# plt.legend(loc="best")
 
-fig, angleplot = plt.subplots()
-plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
-          "Angle from neutral position in radians", "Pitch", "Euler angle plot")
-plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
-plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
-plt.grid()
-plt.legend(loc="best")
+# fig, angleplot = plt.subplots()
+# plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
+#           "Angle from neutral position in radians", "Pitch", "Euler angle plot")
+# plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
+# plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
+# plt.grid()
+# plt.legend(loc="best")
