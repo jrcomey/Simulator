@@ -31,19 +31,34 @@ plt.style.use('fast')
 
 # PID Constants
 
-P =     1000  # unitless
-I =     100   # unitless
-D =     10  # Unitless
+# P =     1 # unitless
+# I =     4   # unitless
+# D =     4 # Unitless
+
+# Positional PID constants
+
+P = 10
+I = 1
+D = 3
+VFF = 0
+AFF = 0
+
+P_ang = 10
+I_ang = 0
+D_ang = 1
+VFF_ang = 0
+AFF_ang = 0
 
 angle_conv_const = 0.1
 
+testtime = 3
 # Drone Properties
 
 #%%###########################
 
 # System Constants
 
-signal_width = 1000 # Width of servo signal channel
+signal_width = 100000000 # Width of servo signal channel
 initial_dt = 1E-3 # Starting dt constant
 
 grav_const = 9.805 # m*s**-2
@@ -285,7 +300,7 @@ class UAV():
         
         self.pos_e = np.array([[0],
                                [0],
-                               [0]])
+                               [5]])
         # Forces and the principle of momentum
         
         self.force_grav = self.mass*acc_grav
@@ -313,8 +328,8 @@ class UAV():
         self.I_2 = 0.2
         self.I_3 = 0.1
         
-        self.angle = np.array([[0],
-                               [0],
+        self.angle = np.array([[0.5],
+                               [-0.5],
                                [0]])
 
         
@@ -354,6 +369,12 @@ class UAV():
         
         self.prev_pos_err = 0
         self.int_pos = 0
+        
+        self.prev_pitch_err = 0
+        self.int_pitch = 0
+        
+        self.prev_roll_err = 0
+        self.int_roll = 0
         
     def UpdateAngle(self, roll, pitch, yaw):
         """
@@ -619,26 +640,7 @@ class UAV():
     
    
     def Hover(self):
-        """
-        Hover function.
-
-        Returns
-        -------
-        None.
-
-        """
-        setpoint_vel = 0
-        err = self.vel_e[2] - setpoint_vel
-        self.int_pos += err*dt
-        der = err - self.prev_pos_err
-        self.signal = np.array([[1],
-                                [1],
-                                [1],
-                                [1]]) * int(P * err + I*self.int_pos + D*der)
-        # print(err)
-        
-        
-        # self.Update()
+        pass
         
     def PitchCorrect(self):
         pass
@@ -845,45 +847,79 @@ class QuadX(UAV):
                    "Motor 3 Thrust" : self.motor_3.thrust}
         self.df = self.df.append(new_row, ignore_index=True)
     
-    def PitchCorrect(self):
-        if self.pitch > 0:
-            # Can't put them both on the same line, += won't work that way
-            self.signal[0] -= 1
-            self.signal[1] -= 1
-            self.signal[2] += 1
-            self.signal[3] += 1
-            
-            
-        if self.pitch < 0:
-            self.signal[0] += 1
-            self.signal[1] += 1
-            self.signal[2] -= 1
-            self.signal[3] -= 1
-        else:
-            pass
+    def Hover(self):
+        """
+        Hover function.
+
+        Returns
+        -------
+        None.
+
+        """
+        setpoint = 0
+        setpoint_vel = 0
+        setpoint_acc = 0
+        err = self.pos_e[2] - setpoint
+        self.int_pos += err*dt
+        der = self.vel_e[2] - setpoint_vel
+        self.signal = np.array([[1],
+                                [1],
+                                [1],
+                                [1]]) * int(P * signal_width * err 
+                                            + I * signal_width * self.int_pos 
+                                            + D * signal_width * der
+                                            + VFF * setpoint_vel
+                                            + AFF * setpoint_acc)
+        self.prev_pos_err = err
+        self.SignalCheck()
+        # print(err)
         
-        print(self.pitch)
+        
+        # self.Update()
+        
     
+    def PitchCorrect(self):
+        
+        # Look into PID position loop
+        setpoint = 0
+        setpoint_vel = 0
+        setpoint_acc = 0
+        err = self.angle[1] - setpoint
+        self.int_pitch += err*dt
+        der = self.omega[1] - setpoint_vel
+        self.signal += np.array([[-1],
+                                [-1],
+                                [1],
+                                [1]]) * int(P_ang * signal_width * err 
+                                            + I_ang * signal_width * self.int_pos 
+                                            + D_ang * signal_width * der
+                                            + VFF_ang * setpoint_vel
+                                            + AFF_ang * setpoint_acc)
+        # self.prev_pos_err = err
+        # print(err)
+        
+        
+        # self.Update()
     def RollCorrect(self):
         
-        if self.roll > 0:
-            # Can't put them both on the same line, += won't work that way
-            self.signal[0] -= 1
-            self.signal[1] += 1
-            self.signal[2] -= 1
-            self.signal[3] += 1
-            
-            
-        if self.roll < 0:
-            self.signal[0] += 1
-            self.signal[1] -= 1
-            self.signal[2] += 1
-            self.signal[3] -= 1
-            
-        else:
-            pass
+        setpoint = 0
+        setpoint_vel = 0
+        setpoint_acc = 0
+        err = self.angle[0] - setpoint
+        self.int_roll += err*dt
+        der = self.omega[0] - setpoint_vel
+        self.signal += np.array([[-1],
+                                [1],
+                                [-1],
+                                [1]]) * int(P_ang * signal_width * err 
+                                            + I_ang * signal_width * self.int_pos 
+                                            + D_ang * signal_width * der
+                                            + VFF_ang * setpoint_vel
+                                            + AFF_ang * setpoint_acc)
+        # self.prev_pos_err = err
+        print(err)
         
-        print(self.roll)
+        # print(self.roll)
         
     def HoverFind(self):
         if self.acc_e[2] < 0.001:
@@ -1053,13 +1089,16 @@ drone.signal[0] = 0
 drone.signal[1] = 0
 drone.signal[2] = 0
 drone.signal[3] = 0
-
 tic = time.time()
-while drone.time < 5:
+
+drone.pitch = 1
+while drone.time < testtime:
+    drone.Update()
     # drone.Stabilize()
     drone.Hover()
-    drone.Update()
+    drone.Stabilize()
     drone.time += dt
+    # print(drone.signal)
     # print(drone.omega_dot)
 
 toc = time.time()
@@ -1069,6 +1108,8 @@ print(tictoc)
 #%%###########################
 
 # Plotting results
+
+
 fig, zplot = plt.subplots()
 plothusly(zplot, drone.df["Time"], -1*drone.df["Z Position"], "Time in seconds",\
           "Z position in metres", "Z Position", "Drone Position")
@@ -1078,38 +1119,38 @@ plt.grid()
 plt.legend(loc="best")
 
 
-# fig = plt.figure()
-# threedplot = fig.add_subplot(111, projection='3d')
-# threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
+fig = plt.figure()
+threedplot = fig.add_subplot(111, projection='3d')
+threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
 # threedplot.set_xlim(-3, 3)
 # threedplot.set_ylim(-3, 3)
 # threedplot.set_zlim(-10, 0)
-# threedplot.set_xlabel('X Position')
-# threedplot.set_ylabel('Y Position')
-# threedplot.set_zlabel('Z Position')
+threedplot.set_xlabel('X Position')
+threedplot.set_ylabel('Y Position')
+threedplot.set_zlabel('Z Position')
 
 
-# fig, zvelplot = plt.subplots()
-# plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
-#           "Z velocity in metres/s", "Drone 1", "Z Velocity")
+fig, zvelplot = plt.subplots()
+plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
+          "Z velocity in metres/s", "Drone 1", "Z Velocity")
 
-# fig, zaccplot = plt.subplots()
+fig, zaccplot = plt.subplots()
 
-# plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
-#           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
+plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
+          "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
-# fig, signalplot = plt.subplots()
-# plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
-# plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
-# plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
-# plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
-# plt.grid()
-# plt.legend(loc="best")
+fig, signalplot = plt.subplots()
+plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
+plt.grid()
+plt.legend(loc="best")
 
-# fig, angleplot = plt.subplots()
-# plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
-#           "Angle from neutral position in radians", "Pitch", "Euler angle plot")
-# plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
-# plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
-# plt.grid()
-# plt.legend(loc="best")
+fig, angleplot = plt.subplots()
+plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
+          "Angle from neutral position in radians", "Pitch", "Euler angle plot")
+plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
+plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
+plt.grid()
+plt.legend(loc="best")
