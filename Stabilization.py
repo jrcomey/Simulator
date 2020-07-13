@@ -29,19 +29,15 @@ plt.style.use('fast')
 
 # Variable Parameters
 
-# PID Constants
-
-# P =     1 # unitless
-# I =     4   # unitless
-# D =     4 # Unitless
-
 # Positional PID constants
 
-P = 10
-I = 1
-D = 3
+P = 0.5
+I = 0
+D = 0.5
 VFF = 0
 AFF = 0
+
+# Angular PID Constants
 
 P_ang = 10
 I_ang = 0
@@ -51,14 +47,14 @@ AFF_ang = 0
 
 angle_conv_const = 0.1
 
-testtime = 3
+testtime = 10
 # Drone Properties
 
 #%%###########################
 
 # System Constants
 
-signal_width = 100000000 # Width of servo signal channel
+signal_width = 300 # Width of servo signal channel
 initial_dt = 1E-3 # Starting dt constant
 
 grav_const = 9.805 # m*s**-2
@@ -328,8 +324,8 @@ class UAV():
         self.I_2 = 0.2
         self.I_3 = 0.1
         
-        self.angle = np.array([[0.5],
-                               [-0.5],
+        self.angle = np.array([[2],
+                               [-2],
                                [0]])
 
         
@@ -847,7 +843,7 @@ class QuadX(UAV):
                    "Motor 3 Thrust" : self.motor_3.thrust}
         self.df = self.df.append(new_row, ignore_index=True)
     
-    def Hover(self):
+    def Hover(self, setpoint):
         """
         Hover function.
 
@@ -856,7 +852,6 @@ class QuadX(UAV):
         None.
 
         """
-        setpoint = 0
         setpoint_vel = 0
         setpoint_acc = 0
         err = self.pos_e[2] - setpoint
@@ -917,7 +912,7 @@ class QuadX(UAV):
                                             + VFF_ang * setpoint_vel
                                             + AFF_ang * setpoint_acc)
         # self.prev_pos_err = err
-        print(err)
+        # print(err)
         
         # print(self.roll)
         
@@ -1095,7 +1090,7 @@ drone.pitch = 1
 while drone.time < testtime:
     drone.Update()
     # drone.Stabilize()
-    drone.Hover()
+    drone.Hover(-30)
     drone.Stabilize()
     drone.time += dt
     # print(drone.signal)
@@ -1108,7 +1103,7 @@ print(tictoc)
 #%%###########################
 
 # Plotting results
-
+print(P, I, D)
 
 fig, zplot = plt.subplots()
 plothusly(zplot, drone.df["Time"], -1*drone.df["Z Position"], "Time in seconds",\
@@ -1119,25 +1114,25 @@ plt.grid()
 plt.legend(loc="best")
 
 
-fig = plt.figure()
-threedplot = fig.add_subplot(111, projection='3d')
-threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
-# threedplot.set_xlim(-3, 3)
-# threedplot.set_ylim(-3, 3)
-# threedplot.set_zlim(-10, 0)
-threedplot.set_xlabel('X Position')
-threedplot.set_ylabel('Y Position')
-threedplot.set_zlabel('Z Position')
+# fig = plt.figure()
+# threedplot = fig.add_subplot(111, projection='3d')
+# threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
+# # threedplot.set_xlim(-3, 3)
+# # threedplot.set_ylim(-3, 3)
+# # threedplot.set_zlim(-10, 0)
+# threedplot.set_xlabel('X Position')
+# threedplot.set_ylabel('Y Position')
+# threedplot.set_zlabel('Z Position')
 
 
-fig, zvelplot = plt.subplots()
-plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
-          "Z velocity in metres/s", "Drone 1", "Z Velocity")
+# fig, zvelplot = plt.subplots()
+# plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
+#           "Z velocity in metres/s", "Drone 1", "Z Velocity")
 
-fig, zaccplot = plt.subplots()
+# fig, zaccplot = plt.subplots()
 
-plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
-          "Z velocity in metres/s", "Drone 1", "Z Acceleration")
+# plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
+#           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
 fig, signalplot = plt.subplots()
 plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
