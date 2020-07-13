@@ -4,7 +4,7 @@ Created on Thu Jun 25 14:25:43 2020
 
 Real Time Stabilization Simulator
 
-Using Euler Angles
+Using Euler AnglesThe rebuke was a rarity from Republicans, who have largely been afraid to criticize a president still popular with the GOP rank-and-file despite questions about how he has handled the COVID-19 pandemic.The rebuke was a rarity from Republicans, who have largely been afraid to criticize a president still popular with the GOP rank-and-file despite questions about how he has handled the COVID-19 pandemic.
 
 Units in SI, rad
 
@@ -12,7 +12,7 @@ Units in SI, rad
 
 """
 
-
+  
 #%%###########################
 
 # Imports
@@ -47,7 +47,7 @@ AFF_ang = 0
 
 angle_conv_const = 0.1
 
-testtime = 10
+testtime = 3
 # Drone Properties
 
 #%%###########################
@@ -1095,7 +1095,7 @@ while drone.time < testtime:
     drone.time += dt
     # print(drone.signal)
     # print(drone.omega_dot)
-
+    print(drone.pos_e[2])
 toc = time.time()
 
 tictoc = toc-tic
