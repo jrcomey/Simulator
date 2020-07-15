@@ -4,7 +4,7 @@ Created on Thu Jun 25 14:25:43 2020
 
 Real Time Stabilization Simulator
 
-Using Euler AnglesThe rebuke was a rarity from Republicans, who have largely been afraid to criticize a president still popular with the GOP rank-and-file despite questions about how he has handled the COVID-19 pandemic.The rebuke was a rarity from Republicans, who have largely been afraid to criticize a president still popular with the GOP rank-and-file despite questions about how he has handled the COVID-19 pandemic.
+Using Euler Angles.
 
 Units in SI, rad
 
@@ -856,7 +856,7 @@ class QuadX(UAV):
                    "Motor 2 Thrust" : self.motor_2.thrust,
                    "Motor 3 Thrust" : self.motor_3.thrust}
         global df
-        df = self.df.append(new_row, ignore_index=True)
+        df = df.append(new_row, ignore_index=True)
     
     def Hover(self, setpoint):
         """
@@ -1212,7 +1212,7 @@ while drone.time < 2*testtime:
     drone.Hover(-15)
     drone.Stabilize()
     drone.time += dt
-    print(drone.pos_e)
+    # print(drone.pos_e)
     tocy = time.time()
     ticytocy = tocy - ticy
     print(ticytocy)
@@ -1227,7 +1227,7 @@ while drone.time < 3*testtime:
     drone.Hover(-15)
     drone.Stabilize()
     drone.time += dt
-    print(drone.pos_e)
+    # print(drone.pos_e)
     tocy = time.time()
     ticytocy = tocy - ticy
     print(ticytocy)
@@ -1236,14 +1236,14 @@ while drone.time < 3*testtime:
 drone.setpoint_x = 5
 drone.setpoint_y = 5
 
-while drone.time < 3*testtime:
+while drone.time < 4*testtime:
     ticy = time.time()
     drone.Update()
     # drone.Stabilize()
     drone.Hover(-15)
     drone.Stabilize()
     drone.time += dt
-    print(drone.pos_e)
+    # print(drone.pos_e)
     tocy = time.time()
     ticytocy = tocy - ticy
     print(ticytocy)
@@ -1291,7 +1291,8 @@ threedplot.set_zlabel('Z Position')
 #           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
 fig, signalplot = plt.subplots()
-plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time", "Motor Signal", "Motor 0", "Motor Signals")
+plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time",\
+          "Motor Signal", "Motor 0", "Motor Signals")
 plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
 plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
 plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
