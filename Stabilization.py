@@ -37,6 +37,11 @@ D = 0.5
 VFF = 0
 AFF = 0
 
+# Velocity PID Constants
+
+P_vel = 0.1
+I_vel = 0
+D_vel = 0.1
 # Angular PID Constants
 
 P_ang = 10
@@ -47,7 +52,7 @@ AFF_ang = 0
 
 angle_conv_const = 0.1
 
-testtime = 3
+testtime = 10
 # Drone Properties
 
 #%%###########################
@@ -294,9 +299,10 @@ class UAV():
                                [0],
                                [0]])
         
-        self.pos_e = np.array([[0],
-                               [0],
-                               [5]])
+        self.pos_e = np.array([[15],
+                               [-20],
+                               [5]])        
+
         # Forces and the principle of momentum
         
         self.force_grav = self.mass*acc_grav
@@ -371,6 +377,13 @@ class UAV():
         
         self.prev_roll_err = 0
         self.int_roll = 0
+        
+        self.int_pos_x = 0
+        self.int_pos_y = 0
+        
+        self.setpoint_x = 0
+        self.setpoint_y = 0
+        self.setpoint_alt = 0
         
     def UpdateAngle(self, roll, pitch, yaw):
         """
@@ -629,8 +642,8 @@ class UAV():
         None.
 
         """
-        self.PitchCorrect()
-        self.RollCorrect()
+        self.PitchControl(0)
+        self.RollControl(0)
         self.YawCorrect()
         # self.Update()
     
@@ -742,7 +755,8 @@ class QuadX(UAV):
                         "Motor 2 Thrust",
                         "Motor 3 Thrust"]
         
-        self.df = pd.DataFrame(columns = column_names)
+        global df
+        df = pd.DataFrame(columns = column_names)
         
         
     def MotorForces(self):
@@ -841,7 +855,8 @@ class QuadX(UAV):
                    "Motor 1 Thrust" : self.motor_1.thrust,
                    "Motor 2 Thrust" : self.motor_2.thrust,
                    "Motor 3 Thrust" : self.motor_3.thrust}
-        self.df = self.df.append(new_row, ignore_index=True)
+        global df
+        df = self.df.append(new_row, ignore_index=True)
     
     def Hover(self, setpoint):
         """
@@ -872,14 +887,46 @@ class QuadX(UAV):
         
         # self.Update()
         
-    
-    def PitchCorrect(self):
+    def Stabilize(self):
+        """
+        Calls individual correction functions to compensate for Euler angle
+        instabilities.
+
+        Returns
+        -------
+        None.
+
+        """
         
-        # Look into PID position loop
-        setpoint = 0
+        self.PitchCommand()
+        self.RollCommand()
+        # self.PitchControl(0)
+        # self.RollControl(0)
+        self.YawCorrect()
+        # self.Update()
+    
+    def PitchCommand(self):
+        
         setpoint_vel = 0
         setpoint_acc = 0
-        err = self.angle[1] - setpoint
+        err = self.pos_e[0] - self.setpoint_x
+        self.int_pos_x += err*dt
+        der = self.vel_e[0] - setpoint_vel
+        setpoint_angle = (P_vel * err
+                         + I_vel * self.int_pos_x
+                         + D_vel * der)
+        
+        setpoint_angle = AngleBounds(setpoint_angle)
+
+        self.PitchControl(setpoint_angle)
+        
+        
+    def PitchControl(self, setpoint_angle):
+        
+        # Look into PID position loop
+        setpoint_vel = 0
+        setpoint_acc = 0
+        err = self.angle[1] - setpoint_angle
         self.int_pitch += err*dt
         der = self.omega[1] - setpoint_vel
         self.signal += np.array([[-1],
@@ -895,12 +942,30 @@ class QuadX(UAV):
         
         
         # self.Update()
-    def RollCorrect(self):
         
-        setpoint = 0
+    def RollCommand(self):
+        
         setpoint_vel = 0
         setpoint_acc = 0
-        err = self.angle[0] - setpoint
+        err = self.pos_e[1] - self.setpoint_y
+        self.int_pos_x += err*dt
+        der = self.vel_e[1] - setpoint_vel
+        setpoint_angle = (P_vel * err
+                         + I_vel * self.int_pos_y
+                         + D_vel * der)
+        setpoint_angle = AngleBounds(setpoint_angle)
+        setpoint_angle = -1 * setpoint_angle
+        # print(setpoint_angle)
+        self.RollControl(setpoint_angle)
+        
+        
+        
+        
+    def RollControl(self, setpoint_angle):
+        
+        setpoint_vel = 0
+        setpoint_acc = 0
+        err = self.angle[0] - setpoint_angle
         self.int_roll += err*dt
         der = self.omega[0] - setpoint_vel
         self.signal += np.array([[-1],
@@ -1034,6 +1099,16 @@ def BodyToStability(original_vector, UAV):
 def StabilityToBody(original_vector, UAV):
     pass
 
+def AngleBounds(setpoint_angle):
+    angle_max = 0.5*mt.pi
+    
+    if setpoint_angle > angle_max:
+        setpoint_angle = angle_max
+    if setpoint_angle < -1*angle_max:
+        setpoint_angle = -1*angle_max
+    
+    return setpoint_angle
+
 def plothusly(ax, x, y, xtitle = '', ytitle ='', \
               datalabel = '', title=''):
     """
@@ -1077,6 +1152,33 @@ def plothus(ax, x, y, datalabel = ''):
 
 #%%###########################
 
+column_names = ["Time",
+                        "X Position",
+                        "Y Position",
+                        "Z Position",
+                        "X Velocity",
+                        "Y Velocity",
+                        "Z Velocity",
+                        "X Acceleration",
+                        "Y Acceleration",
+                        "Z Acceleration",
+                        "Pitch",
+                        "Roll",
+                        "Yaw",
+                        "Motor 0 Signal",
+                        "Motor 1 Signal",
+                        "Motor 2 Signal",
+                        "Motor 3 Signal",
+                        "Motor 0 Thrust",
+                        "Motor 1 Thrust",
+                        "Motor 2 Thrust",
+                        "Motor 3 Thrust"]
+        
+        
+df = pd.DataFrame(columns = column_names)
+
+
+#%%###########################
 # Test Code
 
 drone = QuadX(0.25, 5)
@@ -1087,19 +1189,73 @@ drone.signal[3] = 0
 tic = time.time()
 
 drone.pitch = 1
+
+
 while drone.time < testtime:
+    ticy = time.time()
     drone.Update()
     # drone.Stabilize()
     drone.Hover(-30)
     drone.Stabilize()
     drone.time += dt
-    # print(drone.signal)
-    # print(drone.omega_dot)
-    print(drone.pos_e[2])
+    tocy = time.time()
+    ticytocy = tocy - ticy
+    print(ticytocy)
+
+drone.setpoint_x = 5
+drone.setpoint_y = -5
+
+while drone.time < 2*testtime:
+    ticy = time.time()
+    drone.Update()
+    # drone.Stabilize()
+    drone.Hover(-15)
+    drone.Stabilize()
+    drone.time += dt
+    print(drone.pos_e)
+    tocy = time.time()
+    ticytocy = tocy - ticy
+    print(ticytocy)
+
+drone.setpoint_x = 1
+drone.setpoint_y = 1
+
+while drone.time < 3*testtime:
+    ticy = time.time()
+    drone.Update()
+    # drone.Stabilize()
+    drone.Hover(-15)
+    drone.Stabilize()
+    drone.time += dt
+    print(drone.pos_e)
+    tocy = time.time()
+    ticytocy = tocy - ticy
+    print(ticytocy)
+    
+
+drone.setpoint_x = 5
+drone.setpoint_y = 5
+
+while drone.time < 3*testtime:
+    ticy = time.time()
+    drone.Update()
+    # drone.Stabilize()
+    drone.Hover(-15)
+    drone.Stabilize()
+    drone.time += dt
+    print(drone.pos_e)
+    tocy = time.time()
+    ticytocy = tocy - ticy
+    print(ticytocy)
+
+
+
 toc = time.time()
 
 tictoc = toc-tic
 print(tictoc)
+
+drone.df = df
 #%%###########################
 
 # Plotting results
@@ -1114,15 +1270,15 @@ plt.grid()
 plt.legend(loc="best")
 
 
-# fig = plt.figure()
-# threedplot = fig.add_subplot(111, projection='3d')
-# threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
-# # threedplot.set_xlim(-3, 3)
-# # threedplot.set_ylim(-3, 3)
-# # threedplot.set_zlim(-10, 0)
-# threedplot.set_xlabel('X Position')
-# threedplot.set_ylabel('Y Position')
-# threedplot.set_zlabel('Z Position')
+fig = plt.figure()
+threedplot = fig.add_subplot(111, projection='3d')
+threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
+# threedplot.set_xlim(-3, 3)
+# threedplot.set_ylim(-3, 3)
+# threedplot.set_zlim(-10, 0)
+threedplot.set_xlabel('X Position')
+threedplot.set_ylabel('Y Position')
+threedplot.set_zlabel('Z Position')
 
 
 # fig, zvelplot = plt.subplots()
