@@ -52,7 +52,7 @@ AFF_ang = 0
 
 angle_conv_const = 0.1
 
-testtime = 10
+testtime = 1
 # Drone Properties
 
 #%%###########################
@@ -1150,9 +1150,14 @@ def plothus(ax, x, y, datalabel = ''):
     out = ax.plot(x, y, zorder=1, label=datalabel)
     return out
 
+def ExportData(obj, df, outname = "last_test.csv"):
+    if obj.time % 0.1 == 0:
+        hold = pd.read_csv("last_test.csv")
+    
+    
 #%%###########################
 
-column_names = ["Time",
+column_names = ["Time", 
                         "X Position",
                         "Y Position",
                         "Z Position",
@@ -1256,6 +1261,8 @@ tictoc = toc-tic
 print(tictoc)
 
 drone.df = df
+
+drone.df.to_csv("last_test.csv")
 #%%###########################
 
 # Plotting results
