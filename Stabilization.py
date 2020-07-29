@@ -23,6 +23,7 @@ import math as mt
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import os
 plt.style.use('fast')
 
 #%%###########################
@@ -52,15 +53,16 @@ AFF_ang = 0
 
 angle_conv_const = 0.1
 
-testtime = 1
+testtime = 10
+buffersize = 100
 # Drone Properties
 
 #%%###########################
 
 # System Constants
 
-signal_width = 300 # Width of servo signal channel
-initial_dt = 1E-3 # Starting dt constant
+signal_width = 1000 # Width of servo signal channel
+initial_dt = 1.66E-3 # Starting dt constant
 
 grav_const = 9.805 # m*s**-2
 
@@ -80,6 +82,14 @@ max_motor_thrust = 40 # N
 max_motor_speed = 30 # rad/s
 motor_mass = 0.1
 motor_tau = 0.2 # s
+
+#%%###########################
+
+# Starter Functions
+
+repository_file_name = "last_test.csv"
+
+
 #%%###########################
 
 # Object Definitions
@@ -299,9 +309,9 @@ class UAV():
                                [0],
                                [0]])
         
-        self.pos_e = np.array([[15],
-                               [-20],
-                               [5]])        
+        self.pos_e = np.array([[0],
+                               [0],
+                               [0]])        
 
         # Forces and the principle of momentum
         
@@ -330,9 +340,9 @@ class UAV():
         self.I_2 = 0.2
         self.I_3 = 0.1
         
-        self.angle = np.array([[2],
-                               [-2],
-                               [0]])
+        self.angle = np.array([[0],
+                               [0],
+                               [0.5]])
 
         
         self.omega = np.array([[0],
@@ -378,12 +388,26 @@ class UAV():
         self.prev_roll_err = 0
         self.int_roll = 0
         
-        self.int_pos_x = 0
-        self.int_pos_y = 0
         
+        # PID integral constants
+        
+        self.int_pos_x = 0
+        self.int_pos_xy = 0
+        
+        self.int_pos_y = 0
+        self.int_pos_yx = 0
+        
+        # Initial waypoint settings
         self.setpoint_x = 0
         self.setpoint_y = 0
         self.setpoint_alt = 0
+        
+        self.waypoint_ticker = 0
+        
+        # Flags
+        
+        self.at_waypoint = False
+        self.at_final = False
         
     def UpdateAngle(self, roll, pitch, yaw):
         """
@@ -674,8 +698,14 @@ class UAV():
                 drone.signal[i] = signal_width
             if drone.signal[i] < 0:
                 drone.signal[i] = 0
-        
+   
+    def GetNewWaypoint(self):
+        self.waypoint_ticker += 1    
+        self.current_waypoint = np.array([[waypoints["X"][self.waypoint_ticker]],
+                                     [waypoints["Y"][self.waypoint_ticker]],
+                                     [waypoints["Z"][self.waypoint_ticker]]])
     
+
 class QuadX(UAV):
     """
     Perfectly square quadcopter, with motors in X layout.
@@ -693,7 +723,6 @@ class QuadX(UAV):
         X
     CCW     CW
     """
-    
     def MotorInit(self, motor_thrust, motor_speed, motor_mass):
         """
         Defines motor positions and directions for this quadcopter format
@@ -757,7 +786,7 @@ class QuadX(UAV):
         
         global df
         df = pd.DataFrame(columns = column_names)
-        
+        df.to_csv(repository_file_name)
         
     def MotorForces(self):
         """
@@ -835,12 +864,12 @@ class QuadX(UAV):
     
     def RecordData(self):
         new_row = {"Time" : self.time, 
-                   "X Position" : self.pos_e[0],
-                   "Y Position" : self.pos_e[1],
-                   "Z Position": self.pos_e[2],
-                   "X Velocity" : self.vel_e[0],
-                   "Y Velocity" : self.vel_e[1],
-                   "Z Velocity" : self.vel_e[2],
+                   "X Position" : float(self.pos_e[0]),
+                   "Y Position" : float(self.pos_e[1]),
+                   "Z Position": float(self.pos_e[2]),
+                   "X Velocity" : float(self.vel_e[0]),
+                   "Y Velocity" : float(self.vel_e[1]),
+                   "Z Velocity" : float(self.vel_e[2]),
                    "X Acceleration" : self.acc_e[0],
                    "Y Acceleration" : self.acc_e[1],
                    "Z Acceleration" : self.acc_e[2],
@@ -858,7 +887,7 @@ class QuadX(UAV):
         global df
         df = df.append(new_row, ignore_index=True)
     
-    def Hover(self, setpoint):
+    def Hover(self):
         """
         Hover function.
 
@@ -869,7 +898,7 @@ class QuadX(UAV):
         """
         setpoint_vel = 0
         setpoint_acc = 0
-        err = self.pos_e[2] - setpoint
+        err = self.pos_e[2] - self.setpoint_alt
         self.int_pos += err*dt
         der = self.vel_e[2] - setpoint_vel
         self.signal = np.array([[1],
@@ -880,7 +909,6 @@ class QuadX(UAV):
                                             + D * signal_width * der
                                             + VFF * setpoint_vel
                                             + AFF * setpoint_acc)
-        self.prev_pos_err = err
         self.SignalCheck()
         # print(err)
         
@@ -903,21 +931,29 @@ class QuadX(UAV):
         # self.PitchControl(0)
         # self.RollControl(0)
         self.YawCorrect()
-        # self.Update()
-    
+        self.AngleCheck()
+
     def PitchCommand(self):
         
         setpoint_vel = 0
         setpoint_acc = 0
-        err = self.pos_e[0] - self.setpoint_x
-        self.int_pos_x += err*dt
-        der = self.vel_e[0] - setpoint_vel
-        setpoint_angle = (P_vel * err
+        err_x = self.pos_e[0] - self.setpoint_x
+        err_y = self.pos_e[1] - self.setpoint_y
+        self.int_pos_x += err_x*dt
+        self.int_pos_xy += err_y*dt
+        der_x = self.vel_e[0] - setpoint_vel
+        der_y = self.vel_e[1] - setpoint_vel
+        setpoint_angle = ((P_vel * err_x
                          + I_vel * self.int_pos_x
-                         + D_vel * der)
+                         + D_vel * der_x)
+                         * np.cos(self.yaw)**2
+                         + (P_vel * err_y
+                            + I_vel * self.int_pos_xy
+                            + D_vel * der_y)
+                          * np.sin(self.yaw)**2)
         
         setpoint_angle = AngleBounds(setpoint_angle)
-
+        print(setpoint_angle)
         self.PitchControl(setpoint_angle)
         
         
@@ -932,11 +968,11 @@ class QuadX(UAV):
         self.signal += np.array([[-1],
                                 [-1],
                                 [1],
-                                [1]]) * int(P_ang * signal_width * err 
-                                            + I_ang * signal_width * self.int_pos 
-                                            + D_ang * signal_width * der
-                                            + VFF_ang * setpoint_vel
-                                            + AFF_ang * setpoint_acc)
+                                [1]]) * int((P_ang * signal_width * err 
+                                             + I_ang * signal_width * self.int_pos 
+                                             + D_ang * signal_width * der
+                                             + VFF_ang * setpoint_vel
+                                             + AFF_ang * setpoint_acc))
         # self.prev_pos_err = err
         # print(err)
         
@@ -947,15 +983,23 @@ class QuadX(UAV):
         
         setpoint_vel = 0
         setpoint_acc = 0
-        err = self.pos_e[1] - self.setpoint_y
-        self.int_pos_x += err*dt
-        der = self.vel_e[1] - setpoint_vel
-        setpoint_angle = (P_vel * err
+        err_x = self.pos_e[0] - self.setpoint_x
+        err_y= self.pos_e[1] - self.setpoint_y
+        self.int_pos_y += err_y*dt
+        self.int_pos_yx  += err_x*dt
+        der_y = self.vel_e[1] - setpoint_vel
+        der_x = self.vel_e[0] - setpoint_vel
+        setpoint_angle = ((P_vel * err_y
                          + I_vel * self.int_pos_y
-                         + D_vel * der)
+                         + D_vel * der_y)
+                          * np.cos(self.yaw)**2
+                          + (P_vel * err_x
+                            + I_vel * self.int_pos_yx
+                            + D_vel * der_x)
+                          * np.sin(self.yaw)**2)
         setpoint_angle = AngleBounds(setpoint_angle)
         setpoint_angle = -1 * setpoint_angle
-        # print(setpoint_angle)
+        print(setpoint_angle)
         self.RollControl(setpoint_angle)
         
         
@@ -971,28 +1015,15 @@ class QuadX(UAV):
         self.signal += np.array([[-1],
                                 [1],
                                 [-1],
-                                [1]]) * int(P_ang * signal_width * err 
-                                            + I_ang * signal_width * self.int_pos 
-                                            + D_ang * signal_width * der
-                                            + VFF_ang * setpoint_vel
-                                            + AFF_ang * setpoint_acc)
+                                [1]]) * int((P_ang * signal_width * err 
+                                             + I_ang * signal_width * self.int_pos 
+                                             + D_ang * signal_width * der
+                                             + VFF_ang * setpoint_vel
+                                             + AFF_ang * setpoint_acc))
         # self.prev_pos_err = err
         # print(err)
         
         # print(self.roll)
-        
-    def HoverFind(self):
-        if self.acc_e[2] < 0.001:
-            self.signal -= 1
-        else:
-            print(self.signal)
-            
-
-    
-    
-            
-
-
 #%%###########################
 
 # Function Definition
@@ -1150,11 +1181,30 @@ def plothus(ax, x, y, datalabel = ''):
     out = ax.plot(x, y, zorder=1, label=datalabel)
     return out
 
-def ExportData(obj, df, outname = "last_test.csv"):
-    if obj.time % 0.1 == 0:
-        hold = pd.read_csv("last_test.csv")
+def ExportData(df, outname = "last_test.csv"):
+    """
+    Saves dataframe buffer to file. Saves an incredible amount of time.
+
+    Parameters
+    ----------
+    df : Current vehicle dataframe
+    outname : String of the desired filename. The default is "last_test.csv".
+
+    Returns
+    -------
+    None.
+
+    """
+    df0 = pd.read_csv(outname)
+        
+    #removes the 'unnamed' column
+    df0.drop(df0.columns[df0.columns.str.contains('unnamed',case = False)],axis = 1, inplace = True)
+    df0 = df0.append(df, ignore_index=True)
+    df0.to_csv(outname)
+    df.drop(df.index, inplace = True)
     
-    
+    print("Ping!")
+
 #%%###########################
 
 column_names = ["Time", 
@@ -1185,84 +1235,99 @@ df = pd.DataFrame(columns = column_names)
 
 #%%###########################
 # Test Code
-
+# os.remove("last_test.csv")
 drone = QuadX(0.25, 5)
-drone.signal[0] = 0
-drone.signal[1] = 0
-drone.signal[2] = 0
-drone.signal[3] = 0
 tic = time.time()
 
-drone.pitch = 1
+# drone.pitch = 1
 
 
-while drone.time < testtime:
-    ticy = time.time()
-    drone.Update()
-    # drone.Stabilize()
-    drone.Hover(-30)
-    drone.Stabilize()
-    drone.time += dt
-    tocy = time.time()
-    ticytocy = tocy - ticy
-    print(ticytocy)
 
-drone.setpoint_x = 5
-drone.setpoint_y = -5
+# while drone.time < testtime:
+#     ticy = time.time()
+#     drone.Update()
+#     drone.Hover()
+#     drone.Stabilize()
+#     drone.time += dt
+#     if len(df) >= buffersize:
+#         ExportData(df, repository_file_name)
+#     else:
+#         pass
+#     tocy = time.time()
+#     ticytocy = tocy - ticy
+#     print(ticytocy)
+
+drone.setpoint_x = 10
+drone.setpoint_y = -10
+drone.setpoint_alt = 0
 
 while drone.time < 2*testtime:
     ticy = time.time()
     drone.Update()
-    # drone.Stabilize()
-    drone.Hover(-15)
+    drone.Hover()
     drone.Stabilize()
     drone.time += dt
-    # print(drone.pos_e)
+    if len(df) >= buffersize:
+        ExportData(df, repository_file_name)
+    else:
+        pass
     tocy = time.time()
     ticytocy = tocy - ticy
     print(ticytocy)
 
-drone.setpoint_x = 1
-drone.setpoint_y = 1
+
+drone.setpoint_x = 15
+drone.setpoint_y = 15
+drone.setpoint_alt = -5
 
 while drone.time < 3*testtime:
     ticy = time.time()
     drone.Update()
-    # drone.Stabilize()
-    drone.Hover(-15)
+    drone.Hover()
     drone.Stabilize()
     drone.time += dt
-    # print(drone.pos_e)
+    if len(df) >= buffersize:
+        ExportData(df, repository_file_name)
+    else:
+        pass
+    # print(df)
     tocy = time.time()
     ticytocy = tocy - ticy
     print(ticytocy)
-    
 
-drone.setpoint_x = 5
-drone.setpoint_y = 5
+
+drone.setpoint_x = 0
+drone.setpoint_y = 0
+drone.setpoint_alt = 0
 
 while drone.time < 4*testtime:
     ticy = time.time()
     drone.Update()
-    # drone.Stabilize()
-    drone.Hover(-15)
+    drone.Hover()
     drone.Stabilize()
     drone.time += dt
-    # print(drone.pos_e)
+    if len(df) >= buffersize:
+        ExportData(df, repository_file_name)
+    else:
+        pass
+    # print(df)
     tocy = time.time()
     ticytocy = tocy - ticy
     print(ticytocy)
 
 
-
+#%%##########################
+ExportData(df, repository_file_name)
 toc = time.time()
 
 tictoc = toc-tic
 print(tictoc)
 
-drone.df = df
+# drone.df = df
+drone.df = pd.read_csv(repository_file_name)
+drone.df.drop(drone.df.columns[drone.df.columns.str.contains('unnamed',case = False)],axis = 1, inplace = True)
 
-drone.df.to_csv("last_test.csv")
+
 #%%###########################
 
 # Plotting results
