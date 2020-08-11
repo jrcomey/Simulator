@@ -63,17 +63,18 @@ def plothus(ax, x, y, datalabel = ''):
 
 class Plotter():
     def __init__(self, repository_name):
+        self.repository_name = repository_name
         self.df = pd.read_csv(repository_name)
     
-    def RefreshData(self, repository_name):
-        self.df = pd.read_csv(repository_name)
+    def RefreshData(self):
+        self.df = pd.read_csv(self.repository_name)
 
     def ShowPosition(self):
         
         figure = matplotlib.figure.Figure()
         zplot = figure.add_subplot(111)
         plothusly(zplot, self.df["Time"], -1*self.df["Z Position"], "Time in seconds",\
-                  "Z position in metres", "Z Position", "Drone Position")
+                  "Position in metres", "Z Position", "Drone Position")
         plothus(zplot, self.df["Time"], self.df["Y Position"], "Y Position")
         plothus(zplot, self.df["Time"], self.df["X Position"], "X Position")
         plt.grid()
@@ -133,6 +134,16 @@ class Plotter():
         plt.legend(loc="best")
         return figure
 
+    def GraphAll(self):
+        self.RefreshData()
+        self.ShowPosition()
+        self.ShowVelocity()
+        self.ShowAcceleration()
+        self.ShowSignal()
+        self.ShowEuler()
+if __name__== '__main__':
+    p = Plotter('last_test.csv')
+    p.GraphAll()
 #%%###########################
 
 # T = np.linspace(0, 2*np.pi, 100)

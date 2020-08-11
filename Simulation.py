@@ -24,7 +24,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
-plt.style.use('fast')
+
 
 #%%###########################
 
@@ -33,7 +33,7 @@ plt.style.use('fast')
 # Positional PID constants
 
 P = 0.5
-I = 0
+I = 0.1
 D = 0.5
 VFF = 0
 AFF = 0
@@ -89,12 +89,22 @@ motor_tau = 0.2 # s
 
 # Starter Functions
 
-repository_file_name = "last_test.csv"
 
 
 #%%###########################
 
 # Object Definitions
+
+class Environment():
+    def __init__(self, config, body_num, time_step):
+        pr = pd.read_csv(config)
+        
+        self.grav_const = pr["Gravity"][body_num]
+        global dt
+        dt = time_step
+    
+    
+    
 class Motor():
     """
     
@@ -249,7 +259,34 @@ class Motor():
         self.position = np.array([[x_b],
                                   [y_b],
                                   [z_b]])
+
+class MassTest():
     
+    """
+    An object to test large numbers of UAV simulations at the same time.
+    
+    """
+    
+    
+    def __init__(self, import_file):
+        """
+        Creates an object containing a list of multiple UAV's in order to perform mass tests
+
+        Parameters
+        ----------
+        import_file : Readable .csv file. Each row is an individual UAV and it's properties
+        
+
+        Returns
+        -------
+        None.
+
+        """
+        self.swarm_file = pd.read_csv(import_file)
+        
+        for i in range(len(self.swarm_file)):
+            # Create objects here when you can create drone from a config file
+            pass
 class UAV():
     
     
@@ -283,7 +320,8 @@ class UAV():
         -------
         None.
         """
-        
+        self.repository_file_name = 'last_test.csv'
+
         # Basic Properties
         self.radius = radius
         self.mass = mass
@@ -344,7 +382,7 @@ class UAV():
         
         self.angle = np.array([[0],
                                [0],
-                               [0.5]])
+                               [0]])
 
         
         self.omega = np.array([[0],
@@ -399,6 +437,7 @@ class UAV():
         self.int_pos_y = 0
         self.int_pos_yx = 0
         
+        
         # Initial waypoint settings
         self.setpoint_x = 0
         self.setpoint_y = 0
@@ -411,6 +450,9 @@ class UAV():
         self.at_waypoint = False
         self.at_final = False
         
+        self.last_time = 0
+        self.checktime = 2
+        self.min_dis = 0.2
     def UpdateAngle(self, roll, pitch, yaw):
         """
         Function to update UAV Euler angles.
@@ -700,13 +742,80 @@ class UAV():
                 drone.signal[i] = signal_width
             if drone.signal[i] < 0:
                 drone.signal[i] = 0
-   
+    
+    def CheckWaypoint(self):
+        xterm = (self.current_waypoint[0] - self.pos_e[0])**2
+        yterm = (self.current_waypoint[1] - self.pos_e[1])**2
+        zterm = (self.current_waypoint[2] - self.pos_e[2])**2
+        dis = np.sqrt(xterm + yterm + zterm)
+        
+        if dis < self.min_dis:
+            if self.at_final == True:
+                self.at_waypoint = True
+                print("Simulation Complete. Program will now end.")
+            else:
+                self.at_waypoint = True
+                text = 'Arrived at {self.current_waypoint[0]}, {self.current_waypoint[1]}, {self.current_waypoint[2]}.'
+                print(text)
+                msg = f'Completed waypoint {self.waypoint_ticker} of {len(self.waypoints) -1}'
+                print(msg)
+                self.GetNewWaypoint()
+        else:
+            pass
     def GetNewWaypoint(self):
         self.waypoint_ticker += 1    
-        self.current_waypoint = np.array([[waypoints["X"][self.waypoint_ticker]],
-                                     [waypoints["Y"][self.waypoint_ticker]],
-                                     [waypoints["Z"][self.waypoint_ticker]]])
+        self.current_waypoint = np.array([[self.waypoints["X"][self.waypoint_ticker]],
+                                     [self.waypoints["Y"][self.waypoint_ticker]],
+                                     [self.waypoints["Z"][self.waypoint_ticker]]])
+        self.Setpoint(self.current_waypoint[0], self.current_waypoint[1], self.current_waypoint[2])
+        self.at_waypoint = False
+        if self.waypoint_ticker == len(self.waypoints) - 1:
+            self.at_final = True
+        else:
+            msg = f'Progressing to new waypoint at {self.current_waypoint[0]}, {self.current_waypoint[1]}, {self.current_waypoint[2]}.'
+            print(msg)
     
+    def Setpoint(self, x, y, alt):
+        self.setpoint_x, self.setpoint_y, self.setpoint_alt = x, y, alt
+    
+    def RunSimTimeStep(self):
+        drone.Update()
+        drone.Hover()
+        drone.Stabilize()
+        drone.time += dt
+        if len(df) >= buffersize:
+            ExportData(df, self.repository_file_name)
+            update_message = f'Program is at simulation time {drone.time} at waypoint {self.waypoint_ticker}'
+            print(update_message)
+        else:
+            pass
+                # tocy = time.time()
+                # ticytocy = tocy - ticy
+                # print(ticytocy)
+        if self.time - self.last_time > self.checktime:
+            self.CheckWaypoint()
+            self.last_time = self.time
+            print("Checking waypoints...")
+            time.sleep(0.01)
+        else:
+            pass
+                
+    def RunSimulation(self):
+        tic = time.time()
+        self.ImportWaypoints()
+        self.GetNewWaypoint()
+        self.MainLoop()
+        toc = time.time()
+        tictoc = toc-tic
+        msg = f'The simulation was completed after {tictoc} seconds.'
+        print(msg)
+    
+    def MainLoop(self):
+        while self.at_final == False and self.at_waypoint == False:
+            self.RunSimTimeStep()
+    def ImportWaypoints(self):
+        self.waypoints = pd.read_csv('waypoints.csv')
+        
 
 class QuadX(UAV):
     """
@@ -725,6 +834,8 @@ class QuadX(UAV):
         X
     CCW     CW
     """
+    # def __init__(self,radius, mass):
+    #     super().__init__()
     def MotorInit(self, motor_thrust, motor_speed, motor_mass):
         """
         Defines motor positions and directions for this quadcopter format
@@ -788,7 +899,7 @@ class QuadX(UAV):
         
         global df
         df = pd.DataFrame(columns = column_names)
-        df.to_csv(repository_file_name)
+        df.to_csv(self.repository_file_name)
         
     def MotorForces(self):
         """
@@ -858,13 +969,16 @@ class QuadX(UAV):
                              + self.motor_2.motor_torque
                              + self.motor_3.motor_torque)
         
-    def IncreaseThrust(self):
-        self.signal += 1
-    
-    def DecreaseThrust(self):
-        self.signal -= 1
-    
     def RecordData(self):
+        """
+        Records all positional data at specific time step and adds as a new row to a dataframe.
+        
+
+        Returns
+        -------
+        None.
+
+        """
         new_row = {"Time" : self.time, 
                    "X Position" : float(self.pos_e[0]),
                    "Y Position" : float(self.pos_e[1]),
@@ -886,6 +1000,10 @@ class QuadX(UAV):
                    "Motor 1 Thrust" : self.motor_1.thrust,
                    "Motor 2 Thrust" : self.motor_2.thrust,
                    "Motor 3 Thrust" : self.motor_3.thrust}
+        # Why is this global? 
+        # It saved some time by not adding to an object database
+        # Means that only 1 simulation can be run at a time. Could be reverted but not currently necessary
+        
         global df
         df = df.append(new_row, ignore_index=True)
     
@@ -934,6 +1052,7 @@ class QuadX(UAV):
         # self.RollControl(0)
         self.YawCorrect()
         self.AngleCheck()
+        self.SignalCheck()
 
     def PitchCommand(self):
         """
@@ -1213,11 +1332,11 @@ def ExportData(df, outname = "last_test.csv"):
     df0.to_csv(outname)
     df.drop(df.index, inplace = True)
     
-    print("Ping!")
 
-#%%###########################
+    
 
-column_names = ["Time", 
+def CreateDataFrame():
+    column_names = ["Time", 
                         "X Position",
                         "Y Position",
                         "Z Position",
@@ -1240,9 +1359,14 @@ column_names = ["Time",
                         "Motor 3 Thrust"]
         
         
-df = pd.DataFrame(columns = column_names)
+    df = pd.DataFrame(columns = column_names)
+
+def Initialize():
+    pass
 
 
+drone = QuadX(0.1, 5)
+drone.RunSimulation()
 #%%###########################
 # Test Code
 # os.remove("last_test.csv")
@@ -1250,23 +1374,23 @@ df = pd.DataFrame(columns = column_names)
 
     
     
-drone = QuadX(0.25, 5)
-tic = time.time()
-while drone.time < 2*testtime:
-    # ticy = time.time()
-    drone.Update()
-    drone.Hover()
-    drone.Stabilize()
-    drone.time += dt
-    if len(df) >= buffersize:
-        ExportData(df, repository_file_name)
-    else:
-        pass
-            # tocy = time.time()
-            # ticytocy = tocy - ticy
-            # print(ticytocy)
-    update_message = f'Program is at simulation time {drone.time} of {testtime} seconds'
-    print(update_message)
+# drone = QuadX(0.25, 5)
+# tic = time.time()
+# while drone.time < 2*testtime:
+#     # ticy = time.time()
+#     drone.Update()
+#     drone.Hover()
+#     drone.Stabilize()
+#     drone.time += dt
+#     if len(df) >= buffersize:
+#         ExportData(df, drone.repository_file_name)
+#     else:
+#         pass
+#             # tocy = time.time()
+#             # ticytocy = tocy - ticy
+#             # print(ticytocy)
+#     update_message = f'Program is at simulation time {drone.time} of {testtime} seconds'
+#     print(update_message)
 # drone.pitch = 1
 
 
@@ -1348,65 +1472,66 @@ while drone.time < 2*testtime:
 #     update_message = f'Program is at simulation time {drone.time} of {testtime} seconds'
 #     print(update_message)
 
-
+repository_file_name = "last_test.csv"
 # ExportData(df, repository_file_name)
 # toc = time.time()
 
 # tictoc = toc-tic
 
 
-# # drone.df = df
-# drone.df = pd.read_csv(repository_file_name)
-# drone.df.drop(drone.df.columns[drone.df.columns.str.contains('unnamed',case = False)],axis = 1, inplace = True)
+# drone.df = df# ExportData(df, repository_file_name)
+
+drone.df = pd.read_csv(repository_file_name)
+drone.df.drop(drone.df.columns[drone.df.columns.str.contains('unnamed',case = False)],axis = 1, inplace = True)
 
 
 #%%###########################
 
 # Plotting results
-# print(P, I, D)
+print(P, I, D)
 
-# fig, zplot = plt.subplots()
-# plothusly(zplot, drone.df["Time"], -1*drone.df["Z Position"], "Time in seconds",\
-#           "Z position in metres", "Z Position", "Drone Position")
-# plothus(zplot, drone.df["Time"], drone.df["Y Position"], "Y Position")
-# plothus(zplot, drone.df["Time"], drone.df["X Position"], "X Position")
-# plt.grid()
-# plt.legend(loc="best")
-
-
-# fig = plt.figure()
-# threedplot = fig.add_subplot(111, projection='3d')
-# threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
-# # threedplot.set_xlim(-3, 3)
-# # threedplot.set_ylim(-3, 3)
-# # threedplot.set_zlim(-10, 0)
-# threedplot.set_xlabel('X Position')
-# threedplot.set_ylabel('Y Position')
-# threedplot.set_zlabel('Z Position')
+fig, zplot = plt.subplots()
+plothusly(zplot, drone.df["Time"], -1*drone.df["Z Position"], "Time in seconds",\
+          "Z position in metres", "Z Position", "Drone Position")
+plothus(zplot, drone.df["Time"], drone.df["Y Position"], "Y Position")
+plothus(zplot, drone.df["Time"], drone.df["X Position"], "X Position")
+plt.grid()
+plt.legend(loc="best")
 
 
-# # fig, zvelplot = plt.subplots()
-# # plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
-# #           "Z velocity in metres/s", "Drone 1", "Z Velocity")
+fig = plt.figure()
+threedplot = fig.add_subplot(111, projection='3d')
+threedplot.plot(drone.df["X Position"], drone.df["Y Position"], -1*drone.df["Z Position"])
+# threedplot.set_xlim(-3, 3)
+# threedplot.set_ylim(-3, 3)
+# threedplot.set_zlim(-10, 0)
+threedplot.set_xlabel('X Position')
+threedplot.set_ylabel('Y Position')
+threedplot.set_zlabel('Z Position')
 
-# # fig, zaccplot = plt.subplots()
 
-# # plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
-# #           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
+# fig, zvelplot = plt.subplots()
+# plothusly(zvelplot, drone.df["Time"], drone.df["Z Velocity"], "Time in seconds",\
+#           "Z velocity in metres/s", "Drone 1", "Z Velocity")
 
-# fig, signalplot = plt.subplots()
-# plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time",\
-#           "Motor Signal", "Motor 0", "Motor Signals")
-# plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
-# plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
-# plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
-# plt.grid()
-# plt.legend(loc="best")
+# fig, zaccplot = plt.subplots()
 
-# fig, angleplot = plt.subplots()
-# plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
-#           "Angle from neutral position in radians", "Pitch", "Euler angle plot")
-# plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
-# plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
-# plt.grid()
-# plt.legend(loc="best")
+# plothusly(zaccplot, drone.df["Time"], drone.df["Z Acceleration"], "Time in seconds",\
+#           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
+
+fig, signalplot = plt.subplots()
+plothusly(signalplot, drone.df["Time"], drone.df["Motor 0 Signal"], "Time",\
+          "Motor Signal", "Motor 0", "Motor Signals")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 1 Signal"], "Motor 1")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 2 Signal"], "Motor 2")
+plothus(signalplot, drone.df["Time"], drone.df["Motor 3 Signal"], "Motor 3")
+plt.grid()
+plt.legend(loc="best")
+
+fig, angleplot = plt.subplots()
+plothusly(angleplot, drone.df["Time"], drone.df["Pitch"], "Time in seconds", \
+          "Angle from neutral position in radians", "Pitch", "Euler angle plot")
+plothus(angleplot, drone.df["Time"], drone.df["Yaw"], "Yaw")
+plothus(angleplot, drone.df["Time"], drone.df["Roll"], "Roll")
+plt.grid()
+plt.legend(loc="best")
