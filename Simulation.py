@@ -54,7 +54,7 @@ AFF_ang = 0
 angle_conv_const = 0.1
 
 testtime = 60
-buffersize = 1000
+buffersize = 1E3
 # Drone Properties
 
 #%%###########################
@@ -751,11 +751,12 @@ class UAV():
         
         if dis < self.min_dis:
             if self.at_final == True:
-                self.at_waypoint = True
                 print("Simulation Complete. Program will now end.")
+                self.at_waypoint = True
+                
             else:
                 self.at_waypoint = True
-                text = 'Arrived at {self.current_waypoint[0]}, {self.current_waypoint[1]}, {self.current_waypoint[2]}.'
+                text = f'Arrived at {self.current_waypoint[0]}, {self.current_waypoint[1]}, {self.current_waypoint[2]}.'
                 print(text)
                 msg = f'Completed waypoint {self.waypoint_ticker} of {len(self.waypoints) -1}'
                 print(msg)
@@ -785,7 +786,7 @@ class UAV():
         drone.time += dt
         if len(df) >= buffersize:
             ExportData(df, self.repository_file_name)
-            update_message = f'Program is at simulation time {drone.time} at waypoint {self.waypoint_ticker}'
+            update_message = f'Program is at simulation time {drone.time} at waypoint {self.waypoint_ticker} of waypoint {len(self.waypoints)}'
             print(update_message)
         else:
             pass
@@ -796,7 +797,6 @@ class UAV():
             self.CheckWaypoint()
             self.last_time = self.time
             print("Checking waypoints...")
-            time.sleep(0.01)
         else:
             pass
                 
@@ -1254,12 +1254,50 @@ def BodyToEarth(original_vector, UAV):
     return np.dot(YawConv(-1*UAV.yaw), interstage2)
 
 def BodyToStability(original_vector, UAV):
+    """
+    Currently empty function
+
+    Parameters
+    ----------
+    original_vector : Vector to be transformed to stability FOR
+    UAV : Input drone object, to take attitude data from.
+
+    Returns
+    -------
+    None.
+
+    """
     pass
 
 def StabilityToBody(original_vector, UAV):
-    pass
+    """
+    Currently empty function. Transforms stability vector to a 
+
+    Parameters
+    ----------
+    original_vector : Vector to be transformed to body FOR
+    UAV : Input drone object, to take attitude data from.
+
+    Returns
+    -------
+    None.
+
+    """
 
 def AngleBounds(setpoint_angle):
+    """
+    Ensures that the input angle does flip the aircraft over in an attempt to 
+    move sideways.
+
+    Parameters
+    ----------
+    setpoint_angle : Setpoint angle calculated in the attitude control loop.
+
+    Returns
+    -------
+    setpoint_angle : Setpoint angle in between the bounds of +- 0.5*pi
+
+    """
     angle_max = 0.5*mt.pi
     
     if setpoint_angle > angle_max:
@@ -1365,7 +1403,6 @@ def Initialize():
     pass
 
 
-drone = QuadX(0.1, 5)
 drone.RunSimulation()
 #%%###########################
 # Test Code
