@@ -12,39 +12,39 @@ The package can be downloaded through pip, or through $OTHER_WAY
 
 On Linux, the package is downloadable using:
 
-'''
+```bash
 sudo pip install $THE_PACKAGE_NAME
-'''
+```
 ## Usage
 
 In this simulation, the UAV is built by first configuring a motor object. In an ideal situation, you should have an experimentally determined thrust curve and time response for your motor, but as this package is designed to reduce the need for physical testing, the motor object can be configured from base properties.
 
-'''python
+```python
 motor_sample = UAVsym.Motor() # Creates a generic motor object
 motor_sample.DefineThrustCurve(SympyExpression) # Mathematically defines thrust curve
 motor_sample.SetTau(0.2) # Sets time constant in seconds
-'''
+```
 Alternatively, thrust curves can be defined from a pre-determined dataset.
 
-'''python
+```python
 motor_sample.ImportThrustCurve(thrust_curve.csv) # Imports pre-defined thrust curve
-'''
+```
 
 From there, a UAV object is created, assuming each of the motors on the aircraft are identical. The physics calculation is performed using a state space model, with the matrix layout taken from Dr. $NAME's research on UAV's.
 The UAV itself can be configured using predertimined inertial properties, but the program also allows for determination of inertial properties part-by-part.
 
-'''python
+```python
 drone = UAVsym.UAV(motor_sample) # Creates a UAV using previous motor object
 
 drone.ConfigureInertia(numpyThreeByThree) # Defines Inertial Matrix and verifies it
 drone.SetPID(P, I, D) # Sets PID constants
-'''
+```
 
 Once the vehicle is configured, you can begin testing it for individual properties, or test for a wide range at once. These properties will be printed to terminal, and saved to a file.
-'''python
+```python
 drone.TestOvershoot()
 drone.TestAll()
-'''
+```
 
 The package also supports PID tuning for desired vehicle behaviour.
 
