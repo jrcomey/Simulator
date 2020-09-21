@@ -2,7 +2,7 @@ This is a currently a placeholder introduction.
 
 # UAVsym
 
-UAVsym is a python package designed to provide a virtual testing ground for multicopter Unmanned Arial Vehicles (UAV's) by modelling vehicle behaviour by using a state space model. 
+UAVsym is a python package designed to provide a virtual testing ground for multicopter Unmanned Arial Vehicles (UAV's) by modelling vehicle behaviour by using a state space model. It is intended for use as a design tool to verify UAV flight behaviour.
 It was created after I was unable to find an appropriate space to test aerodynamic properties of an airplane on my university campus. 
 Currently, the package supports a single quadcopter format (X style, all motors equidistant from CoM), but will be updated to include various layouts, as well as other rotary wing formats such as helicopters, and eventually, fixed wing aircraft. 
 
@@ -20,6 +20,8 @@ sudo pip install $THE_PACKAGE_NAME
 In this simulation, the UAV is built by first configuring a motor object. In an ideal situation, you should have an experimentally determined thrust curve and time response for your motor, but as this package is designed to reduce the need for physical testing, the motor object can be configured from base properties.
 
 ```python
+import UAVsym
+
 motor_sample = UAVsym.Motor() # Creates a generic motor object
 motor_sample.DefineThrustCurve(SympyExpression) # Mathematically defines thrust curve
 motor_sample.SetTau(0.2) # Sets time constant in seconds
