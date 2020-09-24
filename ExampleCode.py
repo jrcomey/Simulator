@@ -4,7 +4,7 @@ Meaningless test code
 
 """
 
-import NewTest as usy
+import UAVsym as usy
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -48,13 +48,22 @@ def plothus(ax, x, y, datalabel=''):
     out = ax.plot(x, y, zorder=1, label=datalabel)
     return out
 
-FT = 5
+max_thrust = 5  # Newtons
 
-x = np.linspace(0, 400, 1000)
-y = FT - FT*np.exp(-x/100)
-motor = usy.Motor(100)
-motor.SetTau(0.0001)
-motor.SetThrustCurve(x, y)
+omega = np.linspace(0, 400, 1000)
+thrust = max_thrust - max_thrust*np.exp(-omega/100)
+
+motor = usy.Motor(100)  # Set motor object with 100ms max PWM signal width
+motor.SetTau(0.01)  # Set motor time constant in seconds
+motor.SetThrustCurve(omega, thrust)  # Set motor thrust curve
+
+
+mass = 1  # kg
+Ixx = 0.1  # kg-m^2
+Iyy = 0.1  # kg-m^2
+Izz = 0.1  # kg-m^2
+num_motors = 4  # Number of UAV motors
+clock_speed = 2.1E9  # Clock speed in Hz
 
 
 mixer = np.array([[0, 0, 0, 0],  # Empty
@@ -70,29 +79,20 @@ mixer = np.array([[0, 0, 0, 0],  # Empty
                   [0.25, 0.25, -0.25, -0.25],  # Y Moments (Pitch)
                   [0.25, -0.25, -0.25, 0.25]])  # Z Moments (Yaw)
 
-drone = usy.UAV(1, 0.1, 0.1, 0.1, 4, motor, mixer, 0)
+drone = usy.UAV(mass, Ixx, Iyy, Izz, num_motors,
+                motor, mixer, clock_speed)
 drone.Setdt(0.001)  # Set time step size
-drone.state_vector[2] = 0
-drone.state_vector[6] = -1
+# drone.state_vector[2] = 0
+# drone.state_vector[6] = -1
 
-drone.SetPIDPD(20, 0.1, 10, 0, 0)
+drone.SetPIDPD(10, 1, 1, 100, 10)
 t=0
+finish_time = 20
 tic = time.time()
-while t < 20:
-    # ticky = time.time()
-    # drone.MotorControl()
-    # drone.signal[0], drone.signal[1] = 1000, 1000
-    # drone.Update()
+while t < finish_time:
     drone.RunSimTimeStep()
-    # print(drone.state_vector)
     t += drone.dt
-    # drone.RecordNumpy()
     drone.RecordData()
-    # print(drone.int_vec)
-    # tocky = time.time()
-    # tickytocky = tocky-ticky
-    # print(tickytocky)
-    # print(drone.signal)
 toc = time.time()
 tictoc = toc-tic
 print(drone.state_vector)
