@@ -206,7 +206,7 @@ class UAV():
                                       [0],   # psi
                                       [0],   # phi'
                                       [0],   # theta'
-                                      [0]])  # psi'
+                                      [0]], dtype=float)  # psi'
 
         # State Space Matricies
 
@@ -221,7 +221,7 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],   # psi
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # phi'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # theta'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])  # psi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=float)  # psi'
 
         self.C = np.array([[1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x
                            [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y
@@ -234,20 +234,20 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt],  # psi
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # phi'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # theta'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])       # psi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=float)       # psi'
         
-        self.forward_matrix = np.array([[0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],         # x
-                                        [0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],         # y
-                                        [0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],         # z
-                                        [1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],   # x'
-                                        [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],   # y'
-                                        [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],   # z'
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],         # phi
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],         # theta
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],         # psi
-                                        [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],   # phi'
-                                        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],   # theta'
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt]])  # psi'
+        self.forward_matrix = np.array([[0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                                        [0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],  # y
+                                        [0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],  # z
+                                        [1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x'
+                                        [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y'
+                                        [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z'
+                                        [0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0],  # phi
+                                        [0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0],  # theta
+                                        [0, 0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0],  # psi
+                                        [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi'
+                                        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta'
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt]],dtype=float)  # psi'
 
         # Sets gravitational acceleration
 
@@ -273,13 +273,10 @@ class UAV():
         self.input = np.array([[0],
                                [0],
                                [0],
-                               [0]])
+                               [0]], dtype=float)
         
         # PID loop constants
-        self.alt_int = 0
-        self.ang_int = np.array([[0],
-                                 [0],
-                                 [0]])
+
         self.final_state = np.array([[0],   # x
                                      [0],   # y
                                      [0],   # z
@@ -291,7 +288,7 @@ class UAV():
                                      [0],   # psi
                                      [0],   # phi'
                                      [0],   # theta'
-                                     [0]])  # psi'
+                                     [0]], dtype=float)  # psi'
         
         
         self.int_vec = np.array([[0],   # x
@@ -305,7 +302,7 @@ class UAV():
                                  [0],   # psi
                                  [0],   # phi'
                                  [0],   # theta'
-                                 [0]])  # psi'
+                                 [0]],dtype=float)  # psi'
         # Data storage
         
         self.storage_array = np.zeros((1, len(self.state_vector)
@@ -351,7 +348,7 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],   # psi
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # phi'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # theta'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])  # psi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],dtype=float)  # psi'
 
         self.C = np.array([[1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x
                            [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y
@@ -366,17 +363,17 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # theta'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])       # psi'
         
-        self.forward_matrix = np.array([[0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],         # x
-                                        [0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],         # y
-                                        [0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],         # z
-                                        [1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],   # x'
-                                        [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],   # y'
-                                        [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],   # z'
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],         # phi
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],         # theta
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],         # psi
-                                        [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],   # phi'
-                                        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],   # theta'
+        self.forward_matrix = np.array([[0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                                        [0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],  # y
+                                        [0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],  # z
+                                        [1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x'
+                                        [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y'
+                                        [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z'
+                                        [0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0],  # phi
+                                        [0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0],  # theta
+                                        [0, 0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0],  # psi
+                                        [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi'
+                                        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta'
                                         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt]])  # psi'
 
     def RunSimTimeStep(self):
@@ -404,23 +401,20 @@ class UAV():
         # Determines error vector, and updates error integral vector
         err_vec = self.final_state - self.state_vector
         self.int_vec = err_vec*self.dt + self.int_vec
-        
         # Sum of error vector and error integral
         err_vec = err_vec + self.int_vec*self.K_I
         
         # Set error rate integrals to zero
         self.int_vec[3], self.int_vec[4], self.int_vec[5], self.int_vec[9], self.int_vec[10], self.int_vec[11] = 0,0,0,0,0,0
-        
         # Dot product R**-1, err vec
         err_vec = np.dot(TransformationMatrix(self.state_vector[6].item(),
                                        self.state_vector[7].item(),
                                        self.state_vector[8].item()).transpose(),
                          err_vec)
-        
         # Err vec -> Motor forces
         err_vec = np.dot(self.control_mat,
                           err_vec)
-        
+        self.err_vec = err_vec
         # Motor forces -> PWM signal
         self.signal = np.dot(self.mixer.transpose(), err_vec)
         
@@ -607,15 +601,16 @@ class UAV():
         self.control_mat = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                     [self.K_P_pos, 0, 0, self.K_D_pos, 0, 0, 0, 0, 0, 0, 0, 0],
+                                     [0, self.K_P_pos, 0, 0, self.K_D_pos, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, self.K_P_pos, 0, 0, self.K_D_pos, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                     [0, self.K_P/np.pi, 0, 0, 0, 0, self.K_P, 0, 0, self.K_D, 0, 0],
-                                     [self.K_P/np.pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.K_D, 0],
-                                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.K_D]])
+                                     [0, self.K_P_pos/100*np.pi, 0, 0, self.K_D_pos/100*np.pi, 0, self.K_P, 0, 0, self.K_D, 0, 0],
+                                     [0, 0, 0, 0, 0, 0, 0, self.K_P, 0, 0, self.K_D, 0],
+                                     [0, 0, 0, 0, 0, 0, 0, 0, self.K_P, 0, 0, self.K_D]])
+
 
     def AlterControlMat(self, control_mat_new):
         """
@@ -656,14 +651,43 @@ def TransformationMatrix(phi, theta, psi):
     array : 12x12 transformation matrix
     """
     return np.array([[np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [-1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi)],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi)],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi)]])
+                      [np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [-1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi)],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi)],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi)]])
+
+
+# def TransformationMatrix(phi, theta, psi):
+#     """
+#     Transforms 6 DOF state vector from body axis to earth axis
+
+#     Parameters
+#     ----------
+#     phi : Roll angle in radians
+#     theta : Pitch angle in radians
+#     psi : Yaw angle in radians
+
+#     Returns
+#     -------
+#     array : 12x12 transformation matrix
+#     """
+#     return np.array([[np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#                       [np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#                       [-1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#                       [0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
+#                       [0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
+#                       [0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0],
+#                       [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+#                       [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+#                       [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+#                       [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+#                       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+#                       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])
+
