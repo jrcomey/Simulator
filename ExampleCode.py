@@ -16,7 +16,7 @@ thrust = max_thrust - max_thrust*np.exp(-omega/100)
 
 # Creating base motor object
 
-motor = usy.Motor(100)  # Set motor object with 100ms max PWM signal width
+motor = usy.Motor(500)  # Set motor object with 100ms max PWM signal width
 motor.SetTau(0.05)  # Set motor time constant in seconds
 motor.SetThrustCurve(omega, thrust)  # Set motor thrust curve
 
@@ -46,12 +46,17 @@ mixer = np.array([[0, 0, 0, 0],  # Empty
 
 drone = usy.UAV(mass, Ixx, Iyy, Izz, num_motors,
                 motor, mixer, clock_speed)
+
+# Set initial state to showcase control
+
+drone.state_vector[2] = 10
+drone.state_vector[1] = 5
+drone.state_vector[0] = -5
+drone.state_vector[8] = -0.5
+
+
 drone.Setdt(0.001)  # Set time step size
 
-drone.state_vector[0] = -10  # Set z position to -1 m
-drone.state_vector[1] = -10  # Set z position to -1 m
-drone.state_vector[2] = -10
-drone.state_vector[8] = 0.25*np.pi
 # PID controls for angle, PD control for altitude position
 
 K_P = 10  # P constant, angular
@@ -76,7 +81,7 @@ while t < finish_time:
     drone.RunSimTimeStep()  # Calls control loop and physics simulation
     t += drone.dt  # Advances time step for ticker
     drone.RecordData()  # Records current state at timestamp
-
+    print(drone.signal)
 toc = time.time()  # For program timing purposes (MATLAB tictoc function)
 tictoc = toc-tic
 string = f'State space model took {tictoc} seconds.'
@@ -137,27 +142,6 @@ plothus(zplot, df["Time"], df["Y Position"], "Y Position")
 plothus(zplot, df["Time"], df["X Position"], "X Position")
 plt.grid()
 plt.legend(loc="best")
-
-
-# fig = plt.figure()
-# threedplot = fig.add_subplot(111, projection='3d')
-# threedplot.plot(df["X Position"], df["Y Position"], -1*df["Z Position"])
-# # threedplot.set_xlim(-3, 3)
-# # threedplot.set_ylim(-3, 3)
-# # threedplot.set_zlim(-10, 0)
-# threedplot.set_xlabel('X Position')
-# threedplot.set_ylabel('Y Position')
-# threedplot.set_zlabel('Z Position')
-
-
-# fig, zvelplot = plt.subplots()
-# plothusly(zvelplot, df["Time"], df["Z Velocity"], "Time in seconds",\
-#           "Z velocity in metres/s", "Drone 1", "Z Velocity")
-
-# fig, zaccplot = plt.subplots()
-
-# plothusly(zaccplot, df["Time"], df["Z Acceleration"], "Time in seconds",\
-#           "Z velocity in metres/s", "Drone 1", "Z Acceleration")
 
 
 fig, angleplot = plt.subplots()
