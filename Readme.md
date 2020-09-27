@@ -1,7 +1,6 @@
 # UAVsym
 
 UAVsym is a python package designed to provide a virtual testing ground for multicopter Unmanned Arial Vehicles (UAV's) by modelling vehicle behaviour by using a state space model. It is intended for use as a design tool to verify UAV flight behaviour.
-It was created after I was unable to find an appropriate space to test aerodynamic properties of an airplane on my university campus. 
 The package supports all multirotor formats with static motors (e.g. no tricopters). Motors can be in any orientation.
 
 ## Installation and setup
@@ -43,6 +42,8 @@ mass = 1  # kg
 Ixx = 0.1  # kg-m^2
 Iyy = 0.1  # kg-m^2
 Izz = 0.1  # kg-m^2
+
+
 num_motors = 4  # Number of UAV motors
 clock_speed = 2.1E9  # Clock speed in Hz
 
@@ -58,34 +59,39 @@ mixer = np.array([[0, 0, 0, 0],  # Empty
                   [0, 0, 0, 0],  # Empty 
                   [0.25, -0.25, 0.25, -0.25],  # X Moments (Roll)
                   [0.25, 0.25, -0.25, -0.25],  # Y Moments (Pitch)
-                  [0.25, -0.25, -0.25, 0.25]])  # Z Moments (Yaw)
+                  [0.25, -0.25, -0.25, 0.25]], dtype=float)  # Z Moments (Yaw)
 
 drone = usy.UAV(mass, Ixx, Iyy, Izz, num_motors,
                 motor, mixer, clock_speed)
+
 drone.Setdt(0.001)  # Set time step size
 
-drone.SetPIDPD(20, 0, 10, 100, 10)
+# PID controls for angle, PD control for altitude position
+
+K_P = 10  # P constant, angular
+K_I = 0.01  # I constant, angular
+K_D = 4  # D constant, angular
+K_P_pos = 100  # P constant, altitude
+K_D_pos = 100  # D constant, altitude
+K_P_pos_xy = 1  # XY translational P constant
+K_D_pos_xy = 2  # XY translational D constant
+
+drone.SetPIDPD(K_P, K_I, K_D, K_P_pos, K_D_pos, K_P_pos_xy, K_D_pos_xy)
+
 ```
 
 Once the vehicle is configured, you can begin the simulation. During the re-write of the package, only only time-steps are currently included. This will be addressed shortly.
 ```python
-t=0
-finish_time = 20
+t = 0  # ticker time
+finish_time = 10  # max time
+
 while t < finish_time:
-    # ticky = time.time()
-    # drone.MotorControl()
-    # drone.signal[0], drone.signal[1] = 1000, 1000
-    # drone.Update()
-    drone.RunSimTimeStep()
-    # print(drone.state_vector)
-    t += drone.dt
-    # drone.RecordNumpy()
-    drone.RecordData()
-    # print(drone.int_vec)
-    # tocky = time.time()
-    # tickytocky = tocky-ticky
-    # print(tickytocky)
-    # print(drone.signal)
+    drone.RunSimTimeStep()  # Calls control loop and physics simulation
+    t += drone.dt  # Advances time step for ticker
+    drone.RecordData()  # Records current state at timestamp
+
+# Exports data to pandas dataframe
+df = drone.ExportData()
 ```
 
 The package also supports PID tuning for desired vehicle behaviour.
