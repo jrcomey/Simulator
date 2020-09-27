@@ -176,12 +176,12 @@ class UAV():
         self.Izz = Izz      # kg-m**2
 
         # Environmental Properties
-        self.dt = 0 # s
-        self.time = np.array([0], ndmin=2)  # s
+        self.dt = 0 # s, default
+        self.time = np.array([0], ndmin=2)  # s, ndim fixes a bug in RecordData()
 
         # Configuration
 
-        self.mixer = mixer
+        self.mixer = mixer  # Sets mixer as object property
         
         # Divides mixer by mass and I values to reflect inertial properties
         for i in range(6):
@@ -263,19 +263,19 @@ class UAV():
                                   [0],
                                   [0],
                                   [0]])
-        
-        # Sets feedforward matrix (blank)
 
-        self.D = np.zeros((12, num_motors))
-        
-        # Sets u matrix (Forces, currently 0)
+        # Sets feedforward matrix for motors
+
+        self.D = np.zeros((12, num_motors))  # Initialize as zeros
+
+        # Sets u matrix (Forces in N, Initialized at 0)
 
         self.input = np.array([[0],
                                [0],
                                [0],
                                [0]], dtype=float)
-        
-        # PID loop constants
+
+        # Final state vector, initialized stationary at 0,0,0
 
         self.final_state = np.array([[0],   # x
                                      [0],   # y
@@ -289,8 +289,9 @@ class UAV():
                                      [0],   # phi'
                                      [0],   # theta'
                                      [0]], dtype=float)  # psi'
-        
-        
+
+        # State vector to hold integral values
+
         self.int_vec = np.array([[0],   # x
                                  [0],   # y
                                  [0],   # z
@@ -302,15 +303,15 @@ class UAV():
                                  [0],   # psi
                                  [0],   # phi'
                                  [0],   # theta'
-                                 [0]],dtype=float)  # psi'
+                                 [0]], dtype=float)  # psi'
         # Data storage
-        
-        self.storage_array = np.zeros((1, len(self.state_vector)
-                                              + len(self.signal)
-                                              + len(self.motors)
-                                              + len(self.time)), dtype=float)
+
+        self.storage_array = np.zeros((1, (len(self.state_vector)
+                                           + len(self.signal)
+                                           + len(self.motors)
+                                           + len(self.time))), dtype=float)
         self.InitialCheck()
-    
+
     def InitialCheck(self):
         pass
 
@@ -336,7 +337,7 @@ class UAV():
 
     def Setdt(self, dt):
         self.dt = dt
-        
+
         self.A = np.array([[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],   # x
                            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],   # y
                            [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],   # z
@@ -348,7 +349,8 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],   # psi
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # phi'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # theta'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],dtype=float)  # psi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],  # psi'
+                          dtype=float)
 
         self.C = np.array([[1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x
                            [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y
@@ -401,11 +403,14 @@ class UAV():
         # Determines error vector, and updates error integral vector
         err_vec = self.final_state - self.state_vector
         self.int_vec = err_vec*self.dt + self.int_vec
+
+
         # Sum of error vector and error integral
         err_vec = err_vec + self.int_vec*self.K_I
-        
+
         # Set error rate integrals to zero
         self.int_vec[3], self.int_vec[4], self.int_vec[5], self.int_vec[9], self.int_vec[10], self.int_vec[11] = 0,0,0,0,0,0
+
         # Dot product R**-1, err vec
         err_vec = np.dot(TransformationMatrix(self.state_vector[6].item(),
                                        self.state_vector[7].item(),
@@ -414,7 +419,9 @@ class UAV():
         # Err vec -> Motor forces
         err_vec = np.dot(self.control_mat,
                           err_vec)
-        self.err_vec = err_vec
+        err_vec[9] = AngleCorrect(err_vec[9], -0.5*np.pi, np.pi/2)
+        err_vec[10] = AngleCorrect(err_vec[10], -0.5*np.pi, np.pi/2)
+        err_vec[11] = AngleCorrect(err_vec[11], -0.5*np.pi, np.pi/2)
         # Motor forces -> PWM signal
         self.signal = np.dot(self.mixer.transpose(), err_vec)
         
@@ -580,7 +587,7 @@ class UAV():
             else:
                 pass
 
-    def SetPIDPD(self, P, I, D, P_pos, D_pos):
+    def SetPIDPD(self, P, I, D, P_pos, D_pos, P_pos_xy, D_pos_xy, meter_per_rad=100):
         """
         Sets PID constants and PD constants for hover function
 
@@ -597,7 +604,16 @@ class UAV():
         None.
 
         """
-        self.K_P, self.K_I, self.K_D, self.K_P_pos, self.K_D_pos = P, I, D, P_pos, D_pos
+        # Set PID values as object values
+        self.K_P = P
+        self.K_I = I
+        self.K_D = D
+        self.K_P_pos = P_pos
+        self.K_D_pos = D_pos
+        self.K_P_pos_xy = P_pos_xy
+        self.K_D_pos_xy = D_pos_xy
+        
+        # Define the control matrix
         self.control_mat = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -607,15 +623,17 @@ class UAV():
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                     [0, self.K_P_pos/100*np.pi, 0, 0, self.K_D_pos/100*np.pi, 0, self.K_P, 0, 0, self.K_D, 0, 0],
-                                     [0, 0, 0, 0, 0, 0, 0, self.K_P, 0, 0, self.K_D, 0],
+                                     [0, self.K_P_pos_xy, 0, 0, self.K_D_pos_xy, 0, self.K_P, 0, 0, self.K_D, 0, 0],
+                                     [-1*self.K_P_pos_xy, 0, 0, -1*self.K_D_pos_xy, 0, 0, 0, self.K_P, 0, 0, self.K_D, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, self.K_P, 0, 0, self.K_D]])
 
 
     def AlterControlMat(self, control_mat_new):
         """
         Checks new PIDPD contol matrix is able to replace existing one, then
-        replaces it
+        replaces it.
+        
+        Function is in case you want to directly alter the control matrix.
 
         Parameters
         ----------
@@ -627,10 +645,11 @@ class UAV():
         None.
 
         """
-        # Check that the new matrix matches old dimensions
-        
-        # Change the matrix
-        pass
+        if self.control_mat.shape == control_mat_new.shape:
+            self.control_mat = control_mat_new
+        else:
+            pass
+
 #%###########################
 
 # Functions
@@ -663,31 +682,12 @@ def TransformationMatrix(phi, theta, psi):
                       [0, 0, 0, 0, 0, 0, 0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi)],
                       [0, 0, 0, 0, 0, 0, 0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi)]])
 
-
-# def TransformationMatrix(phi, theta, psi):
-#     """
-#     Transforms 6 DOF state vector from body axis to earth axis
-
-#     Parameters
-#     ----------
-#     phi : Roll angle in radians
-#     theta : Pitch angle in radians
-#     psi : Yaw angle in radians
-
-#     Returns
-#     -------
-#     array : 12x12 transformation matrix
-#     """
-#     return np.array([[np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                       [np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                       [-1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                       [0, 0, 0, np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi)-np.sin(psi)*np.cos(phi), np.cos(psi)*np.sin(theta)*np.cos(phi)+np.sin(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
-#                       [0, 0, 0, np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi)+np.cos(psi)*np.cos(phi), np.sin(psi)*np.sin(theta)*np.cos(phi)-np.cos(psi)*np.sin(phi), 0, 0, 0, 0, 0, 0],
-#                       [0, 0, 0, -1*np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi), 0, 0, 0, 0, 0, 0],
-#                       [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-#                       [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-#                       [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-#                       [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-#                       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-#                       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])
+def AngleCorrect(angle, min_ang, max_ang):
+    if angle < min_ang:
+        angle = min_ang
+    elif angle > max_ang:
+        angle = max_ang
+    else:
+        pass
+    return angle
 
