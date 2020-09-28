@@ -6,12 +6,13 @@ Example Code
 import UAVsym as usy
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 # Defining motor thrust curve
 
 max_thrust = 10   # Newtons
 
-omega = np.linspace(0, 400, 1000)
+omega = np.linspace(0, 400, 1000)  # Values between 0 and 400 rad/s
 thrust = max_thrust - max_thrust*np.exp(-omega/100)
 
 # Creating base motor object
@@ -69,23 +70,10 @@ K_D_pos_xy = 2  # XY translational D constant
 
 drone.SetPIDPD(K_P, K_I, K_D, K_P_pos, K_D_pos, K_P_pos_xy, K_D_pos_xy)
 
-# Main loop
-
-t = 0  # ticker time
-finish_time = 10  # max time
-tic = time.time()  # For program timing purposes (MATLAB tictoc function)
 
 # Main loop:
 
-while t < finish_time:
-    drone.RunSimTimeStep()  # Calls control loop and physics simulation
-    t += drone.dt  # Advances time step for ticker
-    drone.RecordData()  # Records current state at timestamp
-    print(drone.signal)
-toc = time.time()  # For program timing purposes (MATLAB tictoc function)
-tictoc = toc-tic
-string = f'State space model took {tictoc} seconds.'
-print(string)
+drone.RunSim(10)
 
 # Exports data to pandas dataframe
 df = drone.ExportData()
@@ -93,8 +81,6 @@ df = drone.ExportData()
 #%%###########################
 
 # For plotting results only! Not contained in sample code.
-
-import matplotlib.pyplot as plt
 
 def plothusly(ax, x, y, xtitle='', ytitle='',
               datalabel='', title=''):
@@ -146,7 +132,7 @@ plt.legend(loc="best")
 
 fig, angleplot = plt.subplots()
 plothusly(angleplot, df["Time"], df["Pitch"], "Time in seconds", \
-              "Angle from neutral position in radians", "Pitch", "Euler angle plot")
+              "Angle from neutral position in radians", "Pitch", "NED Aircraft Attitude")
 plothus(angleplot, df["Time"], df["Yaw"], "Yaw")
 plothus(angleplot, df["Time"], df["Roll"], "Roll")
 plt.grid()

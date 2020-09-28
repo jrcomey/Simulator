@@ -177,7 +177,7 @@ class UAV():
 
         # Environmental Properties
         self.dt = 0 # s, default
-        self.time = np.array([0], ndmin=2)  # s, ndim fixes a bug in RecordData()
+        self.time = np.array([0], ndmin=2, dtype=float)  # s, ndim fixes a bug in RecordData()
 
         # Configuration
 
@@ -377,6 +377,11 @@ class UAV():
                                         [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi'
                                         [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta'
                                         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt]])  # psi'
+    
+    def RunSim(self, finish_time):
+        while self.time < finish_time:
+            self.RunSimTimeStep()  # Calls control loop and physics simulation
+            self.RecordData()  # Records current state at timestamp
 
     def RunSimTimeStep(self):
         """
@@ -473,6 +478,7 @@ class UAV():
                                 self.input))                  # Local forces
                 + self.acc_grav                               # Gravity
                 )
+
         self.state_vector = (
                              np.dot(self.C, self.state_vector)    # State C
                              + np.dot(self.D, self.input)         # Feedforward
@@ -530,7 +536,7 @@ class UAV():
         for i in range(len(self.motors)):
             tempname = f'Motor {i} Force'
             columns.append(tempname)
-
+        self.storage_array = np.delete(self.storage_array, obj=0, axis=0)
         return pd.DataFrame(columns=columns, data=self.storage_array)
             
     def SignalCheck(self):
