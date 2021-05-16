@@ -1,13 +1,20 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
+Created on Wed Feb 24 15:55:31 2021
 
-Example Code
+@author: jack
 """
 
 import UAVsym as usy
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matlab.engine
 
+eng = matlab.engine.start_matlab()
+print("Matlab booted")
 # Defining motor thrust curve
 
 max_thrust = 10   # Newtons
@@ -30,6 +37,19 @@ Izz = 0.1  # kg-m^2
 
 num_motors = 4  # Number of UAV motors
 clock_speed = 2.1E9  # Clock speed in Hz
+
+B = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])
 
 
 mixer = np.array([[0, 0, 0, 0],  # Empty
@@ -60,25 +80,33 @@ drone.Setdt(0.001)  # Set time step size
 
 # PID controls for angle, PD control for altitude position
 
-K_P = 10  # P constant, angular
-K_I = 0.01  # I constant, angular
-K_D = 4  # D constant, angular
-K_P_pos = 100  # P constant, altitude
-K_D_pos = 100  # D constant, altitude
+K_P = 1  # P constant, angular
+K_I = 0  # I constant, angular
+K_D = 0  # D constant, angular
+K_P_pos = 1  # P constant, altitude
+K_D_pos = 0  # D constant, altitude
 K_P_pos_xy = 1  # XY translational P constant
-K_D_pos_xy = 2  # XY translational D constant
+K_D_pos_xy = 0  # XY translational D constant
 
 drone.SetPIDPD(K_P, K_I, K_D, K_P_pos, K_D_pos, K_P_pos_xy, K_D_pos_xy)
 
+B = np.dot(np.eye(12), drone.mixer)
+
+rho = 1
+
+LQR = eng.lqr(matlab.double(drone.A.tolist()),
+              matlab.double(B.tolist()),
+              matlab.double(np.eye(12).tolist()),
+              matlab.double((rho*np.eye(4)).tolist())
+              )
+print("LQR found")
+
+drone.AlterControlMat(np.asarray(LQR))
 
 # Main loop:
 
-tic = time.time()
-drone.RunSim(30)
-toc = time.time()
+drone.RunSim(10)
 
-tictoc = toc-tic
-print(f"Elapsed Time: {tictoc}")
 # Exports data to pandas dataframe
 df = drone.ExportData()
 
@@ -125,7 +153,38 @@ def plothus(ax, x, y, datalabel=''):
     out = ax.plot(x, y, zorder=1, label=datalabel)
     return out
 
-plt.style.use("classic")
+plt.style.use("default")
+plt.style.use("seaborn-bright")
+
+
+params={#FONT SIZES
+    'axes.labelsize':30,#Axis Labels
+    'axes.titlesize':30,#Title
+    'font.size':28,#Textbox
+    'xtick.labelsize':22,#Axis tick labels
+    'ytick.labelsize':22,#Axis tick labels
+    'legend.fontsize':24,#Legend font size
+    'font.family':'sans-serif',
+    'font.fantasy':'xkcd',
+    'font.sans-serif':'Helvetica',
+    'font.monospace':'Courier',
+    #AXIS PROPERTIES
+    'axes.titlepad':2*6.0,#title spacing from axis
+    'axes.grid':True,#grid on plot
+    'figure.figsize':(12,12),#square plots
+    # 'savefig.bbox':'tight',#reduce whitespace in saved figures#LEGEND PROPERTIES
+    'legend.framealpha':0.5,
+    'legend.fancybox':True,
+    'legend.frameon':True,
+    'legend.numpoints':1,
+    'legend.scatterpoints':1,
+    'legend.borderpad':0.1,
+    'legend.borderaxespad':0.1,
+    'legend.handletextpad':0.2,
+    'legend.handlelength':1.0,
+    'legend.labelspacing':0,}
+mpl.rcParams.update(params)
+
 fig, zplot = plt.subplots()
 plothusly(zplot, df["Time"], -1*df["Z Position"], "Time in seconds",\
           "Position in metres", "Z Position", "NED Drone Position")

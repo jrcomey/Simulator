@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Sep 15 18:35:29 2020
+Created on Sat May  8 16:11:47 2021
 
 @author: jack
 """
@@ -11,6 +11,7 @@ Created on Tue Sep 15 18:35:29 2020
 import numpy as np
 import pandas as pd
 import copy
+
 #%###########################
 
 # Objects
@@ -147,7 +148,7 @@ class UAV():
     Generalized multirotor UAV object.
     """
     
-    def __init__(self, mass, Ixx, Iyy, Izz, num_motors, motor_obj, mixer, clock_speed):
+    def __init__(self, mass, I, num_motors, motor_obj, mixer, clock_speed):
         """
         Initializes and defines basic properties of an n-motor UAV
 
@@ -171,9 +172,6 @@ class UAV():
 
         # UAV physical properties
         self.mass = mass  # kg
-        self.Ixx = Ixx      # kg-m**2
-        self.Iyy = Iyy      # kg-m**2
-        self.Izz = Izz      # kg-m**2
 
         # Environmental Properties
         self.dt = 0 # s, default
@@ -181,19 +179,9 @@ class UAV():
 
         # Configuration
 
-        self.mixer = mixer  # Sets mixer as object property
-        
-        # Divides mixer by mass and I values to reflect inertial properties
-        for i in range(6):
-            self.mixer[i] = self.mixer[i]/self.mass
-        self.mixer[6] = self.mixer[6] / self.Ixx
-        self.mixer[9] = self.mixer[9] / self.Ixx
-        self.mixer[7] = self.mixer[7] / self.Iyy
-        self.mixer[10] = self.mixer[10] / self.Iyy
-        self.mixer[8] = self.mixer[8] / self.Izz
-        self.mixer[11] = self.mixer[11] / self.Izz
+        self.mixer = copy.deepcopy(mixer)  # Sets mixer as object property
 
-        # State Space Vector
+        # State Vector
 
         self.state_vector = np.array([[0],   # x
                                       [0],   # y
@@ -222,32 +210,48 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # phi'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # theta'
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=float)  # psi'
-
-        self.C = np.array([[1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x
-                           [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y
-                           [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # x'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # y'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # z'
-                           [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi
-                           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta
-                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt],  # psi
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # phi'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # theta'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=float)       # psi'
         
-        self.forward_matrix = np.array([[0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],  # x
-                                        [0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],  # y
-                                        [0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],  # z
-                                        [1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x'
-                                        [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y'
-                                        [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z'
-                                        [0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0],  # phi
-                                        [0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0],  # theta
-                                        [0, 0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0],  # psi
-                                        [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi'
-                                        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta'
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt]],dtype=float)  # psi'
+        self.B = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # x
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # y
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # z
+                           [0, 0, 0, 1/mass, 0, 0, 0, 0, 0, 0, 0, 0],       # x'
+                           [0, 0, 0, 0, 1/mass, 0, 0, 0, 0, 0, 0, 0],       # y'
+                           [0, 0, 0, 0, 0, 1/mass, 0, 0, 0, 0, 0, 0],       # z'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # phi
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # theta
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # psi
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # phi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],            # theta'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],           # psi'
+                          dtype=float)
+        
+        self.B[9:12, 9:12] = np.linalg.inv(I)
+
+        self.C = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                           [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # y
+                           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # z
+                           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],        # x'
+                           [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],        # y'
+                           [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],        # z'
+                           [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],  # phi
+                           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],  # theta
+                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],  # psi
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],        # phi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],        # theta'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])       # psi'
+        
+        self.forward_matrix = np.array([[self.dt, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                                        [0, self.dt, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],  # y
+                                        [0, 0, self.dt, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],  # z
+                                        [0, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x'
+                                        [0, 0, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y'
+                                        [0, 0, 0, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z'
+                                        [0, 0, 0, 0, 0, 0, self.dt, 0, 0, self.dt**2/2, 0, 0],  # phi
+                                        [0, 0, 0, 0, 0, 0, 0, self.dt, 0, 0, self.dt**2/2, 0],  # theta
+                                        [0, 0, 0, 0, 0, 0, 0, 0, self.dt, 0, 0, self.dt**2/2],  # psi
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, self.dt, 0, 0],  # phi'
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.dt, 0],  # theta'
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.dt]])  # psi'
 
         # Sets gravitational acceleration
 
@@ -256,7 +260,7 @@ class UAV():
                                   [0],
                                   [0],
                                   [0],
-                                  [9.807],  # ms**-2
+                                  [9.8507],  # ms**-2
                                   [0],
                                   [0],
                                   [0],
@@ -270,25 +274,9 @@ class UAV():
 
         # Sets u matrix (Forces in N, Initialized at 0)
 
-        self.input = np.array([[0],
-                               [0],
-                               [0],
-                               [0]], dtype=float)
+        self.input = np.zeros((num_motors, 1))
 
         # Final state vector, initialized stationary at 0,0,0
-
-        self.final_state = np.array([[0],   # x
-                                     [0],   # y
-                                     [0],   # z
-                                     [0],   # x'
-                                     [0],   # y'
-                                     [0],   # z'
-                                     [0],   # phi
-                                     [0],   # theta
-                                     [0],   # psi
-                                     [0],   # phi'
-                                     [0],   # theta'
-                                     [0]], dtype=float)  # psi'
 
         # State vector to hold integral values
 
@@ -305,15 +293,23 @@ class UAV():
                                  [0],   # theta'
                                  [0]], dtype=float)  # psi'
         # Data storage
+        # self.InitialCheck()
 
-        self.storage_array = np.zeros((1, (len(self.state_vector)
-                                           + len(self.signal)
-                                           + len(self.motors)
-                                           + len(self.time))), dtype=float)
-        self.InitialCheck()
+        self.gain = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                              [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # y
+                              [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # z
+                              [0, 0, 0, 1/mass, 0, 0, 0, 0, 0, 0, 0, 0],        # x'
+                              [0, 0, 0, 0, 1/mass, 0, 0, 0, 0, 0, 0, 0],        # y'
+                              [0, 0, 0, 0, 0, 1/mass, 0, 0, 0, 0, 0, 0],        # z'
+                              [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],  # phi
+                              [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],  # theta
+                              [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],  # psi
+                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],        # phi'
+                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],        # theta'
+                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])       # psi'
+        
+        self.gain[9:12, 9:12] = np.linalg.inv(I)
 
-    def InitialCheck(self):
-        pass
 
     def MotorInit(self, num_motors, motor_obj):
         """
@@ -352,36 +348,76 @@ class UAV():
                            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],  # psi'
                           dtype=float)
 
-        self.C = np.array([[1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x
-                           [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y
-                           [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # x'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # y'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # z'
-                           [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi
-                           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta
-                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt],  # psi
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # phi'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],        # theta'
-                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])       # psi'
+        self.C = np.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                           [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # y
+                           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # z
+                           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],        # x'
+                           [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],        # y'
+                           [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],        # z'
+                           [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],  # phi
+                           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],  # theta
+                           [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],  # psi
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],        # phi'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],        # theta'
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])       # psi'
         
-        self.forward_matrix = np.array([[0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],  # x
-                                        [0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],  # y
-                                        [0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],  # z
-                                        [1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x'
-                                        [0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y'
-                                        [0, 0, 1, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z'
-                                        [0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0],  # phi
-                                        [0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0, 0],  # theta
-                                        [0, 0, 0, 0, 0, 0, 0, 0, self.dt**2/2, 0, 0, 0],  # psi
-                                        [0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0, 0],  # phi'
-                                        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt, 0],  # theta'
-                                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, self.dt]])  # psi'
+        self.forward_matrix = np.array([[self.dt, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0, 0],  # x
+                                        [0, self.dt, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0, 0],  # y
+                                        [0, 0, self.dt, 0, 0, self.dt**2/2, 0, 0, 0, 0, 0, 0],  # z
+                                        [0, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0, 0],  # x'
+                                        [0, 0, 0, 0, self.dt, 0, 0, 0, 0, 0, 0, 0],  # y'
+                                        [0, 0, 0, 0, 0, self.dt, 0, 0, 0, 0, 0, 0],  # z'
+                                        [0, 0, 0, 0, 0, 0, self.dt, 0, 0, self.dt**2/2, 0, 0],  # phi
+                                        [0, 0, 0, 0, 0, 0, 0, self.dt, 0, 0, self.dt**2/2, 0],  # theta
+                                        [0, 0, 0, 0, 0, 0, 0, 0, self.dt, 0, 0, self.dt**2/2],  # psi
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, self.dt, 0, 0],  # phi'
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.dt, 0],  # theta'
+                                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.dt]])  # psi'
+        
+        # self.inv_B = np.linalg.inv(self.B)
+
     
     def RunSim(self, finish_time):
+        
+        # Grid
+        
+        N = int(finish_time / self.dt)
+        self.indexer = 0
+        
+        
+        self.storage_array = np.zeros((N, (len(self.state_vector)
+                                   + len(self.signal)
+                                   + len(self.motors)
+                                   + len(self.time))), dtype=float)
+        
         while self.time < finish_time:
             self.RunSimTimeStep()  # Calls control loop and physics simulation
+            try:
+                self.RecordData()  # Records current state at timestamp
+            except IndexError:
+                pass
+
+    def RunSimHighFidelity(self, finish_time):
+        
+        # Grid
+        
+        N = int(finish_time / self.dt)
+        self.indexer = 0
+        
+        # Initializing the entire grid
+        # Doing this instead of appending rows literally halves caluclation time
+        self.storage_array = np.zeros((N, (len(self.state_vector)
+                                   + len(self.signal)
+                                   + len(self.motors)
+                                   + len(self.time))), dtype=float)
+        
+        while self.time < finish_time:
+            self.RunSimTimeStepHighFidelity()  # Calls control loop and physics simulation
             self.RecordData()  # Records current state at timestamp
+
+    def RunSimNoRecord(self, finish_time):
+        while self.time < finish_time:
+            self.RunSimTimeStep()  # Calls control loop and physics simulation
 
     def RunSimTimeStep(self):
         """
@@ -395,6 +431,18 @@ class UAV():
         self.MotorControl()
         self.Update()
 
+    def RunSimTimeStepHighFidelity(self):
+        """
+        Runs simulation at new time step for interval of t=dt
+
+        Returns
+        -------
+        None.
+
+        """
+        self.MotorControl()
+        self.UpdateDifEeqs()
+
     def MotorControl(self):
         """
         Determines motor signals in response to PID control loop.
@@ -406,30 +454,34 @@ class UAV():
         """
         
         # Determines error vector, and updates error integral vector
-        err_vec = self.final_state - self.state_vector
+        
+        final_state = self.Guidance(self.time)
+        
+        err_vec = final_state - self.state_vector
         self.int_vec = err_vec*self.dt + self.int_vec
-
 
         # Sum of error vector and error integral
         err_vec = err_vec + self.int_vec*self.K_I
 
         # Set error rate integrals to zero
-        self.int_vec[3], self.int_vec[4], self.int_vec[5], self.int_vec[9], self.int_vec[10], self.int_vec[11] = 0,0,0,0,0,0
+        self.int_vec[3], self.int_vec[4], self.int_vec[5], self.int_vec[6], self.int_vec[7], self.int_vec[8], self.int_vec[9], self.int_vec[10], self.int_vec[11] = 0,0,0,0,0,0,0,0,0
 
         # Dot product R**-1, err vec
         err_vec = np.dot(TransformationMatrix(self.state_vector[6].item(),
                                        self.state_vector[7].item(),
                                        self.state_vector[8].item()).transpose(),
                          err_vec)
+
         # Err vec -> Motor forces
         err_vec = np.dot(self.control_mat,
                           err_vec)
-        err_vec[9] = AngleCorrect(err_vec[9], -0.5*np.pi, np.pi/2)
-        err_vec[10] = AngleCorrect(err_vec[10], -0.5*np.pi, np.pi/2)
-        err_vec[11] = AngleCorrect(err_vec[11], -0.5*np.pi, np.pi/2)
+        # print(err_vec.shape)
+        err_vec = np.dot(self.gain,
+                         err_vec)
+
         # Motor forces -> PWM signal
-        self.signal = np.dot(self.mixer.transpose(), err_vec)
-        
+        self.signal = np.dot(self.mixer.transpose(), err_vec)      
+  
         # Check signal validity & convert to integer
         self.SignalCheck()
 
@@ -444,7 +496,7 @@ class UAV():
         """
         self.UpdateMotors()
         self.StateSpaceKinematics()
-
+        
     def UpdateMotors(self):
         """
         Determines current motor output, given input signal and motor time 
@@ -474,6 +526,84 @@ class UAV():
                 + np.dot(TransformationMatrix(self.state_vector[6].item(),  # Local forces
                                               self.state_vector[7].item(),  # -> Earth axis
                                               self.state_vector[8].item()),
+                         np.dot(self.B, np.dot(self.mixer,
+                                self.input)))                 # Local forces
+                + self.acc_grav                               # Gravity
+                )
+
+        self.state_vector = (
+                             np.dot(self.C, self.state_vector)    # State C
+                             + np.dot(self.D, self.input)         # Feedforward
+                             + np.dot(self.forward_matrix, xdot)  # Adds acc
+                             )
+        # Can't use += because self.time is an array, so it can be concat later
+        self.time = self.time + self.dt
+        self.AngleCheck()
+        
+    def Guidance(self, time):
+        """
+        
+
+        Parameters
+        ----------
+        time : Current State Time
+
+        Returns
+        -------
+        Final state vector x_f
+
+        """
+        
+        target_state = self.GuideFunc(time)
+        
+        if target_state is None:
+            return np.zeros((12,1))
+        else:
+            return target_state
+        
+    def GuideFunc(self, time):
+        """
+        Dummy Function
+
+        Parameters
+        ----------
+        time : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        return None
+
+    def UpdateDifEqs(self):
+        """
+        Updates motor forces, and determines new state vector.
+        
+        Returns
+        -------
+        None.
+
+        """
+        self.UpdateMotors()
+        self.StateSpaceDifEqs()
+
+    def StateSpaceDifEqs(self):
+        """
+        High fidelity modeling of DifEqs
+
+        Returns
+        -------
+        None.
+
+        """
+        # X'(t) calculation
+        xdot = (
+                np.dot(self.A, self.state_vector)             # State vector A
+                + np.dot(TransformationMatrix(self.state_vector[6].item(),  # Local forces
+                                              self.state_vector[7].item(),  # -> Earth axis
+                                              self.state_vector[8].item()),
                          np.dot(self.mixer,
                                 self.input))                  # Local forces
                 + self.acc_grav                               # Gravity
@@ -487,6 +617,21 @@ class UAV():
         # Can't use += because self.time is an array, so it can be concat later
         self.time = self.time + self.dt
         self.AngleCheck()
+    
+    def SetGuideFunc(self, F):
+        """
+        Sets Guide Function to Input
+
+        Parameters
+        ----------
+        F : Guide Function
+
+        Returns
+        -------
+        None.
+
+        """
+        self.GuideFunc = F
     
     def RecordData(self):
         """
@@ -504,8 +649,8 @@ class UAV():
                                   self.state_vector.transpose(),
                                   self.signal.transpose(),
                                   motor_forces), axis=1)
-        self.storage_array = np.concatenate((self.storage_array,
-                                             new_row), axis=0)
+        self.storage_array[self.indexer] = new_row
+        self.indexer += 1
 
     def ExportData(self):
         """
@@ -538,7 +683,12 @@ class UAV():
             columns.append(tempname)
         self.storage_array = np.delete(self.storage_array, obj=0, axis=0)
         return pd.DataFrame(columns=columns, data=self.storage_array)
-            
+        self.storage_array = np.zeros((1, (len(self.state_vector)
+                                           + len(self.signal)
+                                           + len(self.motors)
+                                           + len(self.time))), dtype=float)
+        self.time = np.array([0], ndmin=2, dtype=float)
+
     def SignalCheck(self):
         """
         Limits PWM motor signals to pre-defined bounds and converts to integer
@@ -555,7 +705,7 @@ class UAV():
                 self.signal[i] = 0
             else:
                 self.signal[i] = round(self.signal[i].item())
-        
+
     def AngleCheck(self):
         """
         Checks Euler angles to see if they're out of bounds, and corrects them'
@@ -620,11 +770,12 @@ class UAV():
         self.K_D_pos_xy = D_pos_xy
         
         # Define the control matrix
+       
         self.control_mat = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                     [self.K_P_pos, 0, 0, self.K_D_pos, 0, 0, 0, 0, 0, 0, 0, 0],
-                                     [0, self.K_P_pos, 0, 0, self.K_D_pos, 0, 0, 0, 0, 0, 0, 0],
+                                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, self.K_P_pos, 0, 0, self.K_D_pos, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -656,6 +807,26 @@ class UAV():
         else:
             pass
 
+    def Reset(self):
+        """
+        Resets all state values to zero
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        self.ClearStorage()
+        self.state_vector = np.zeros((12,1))
+        self.input = np.zeros((len(self.input), 1))
+        self.time = np.zeros_like(self.time)
+    
+    def ClearStorage(self):
+        self.storage_array = np.zeros((1, (len(self.state_vector)
+                                           + len(self.signal)
+                                           + len(self.motors)
+                                           + len(self.time))), dtype=float)
 #%###########################
 
 # Functions
@@ -697,3 +868,23 @@ def AngleCorrect(angle, min_ang, max_ang):
         pass
     return angle
 
+def R_roll(P, phi):
+    R = np.array([[1, 0, 0],
+                  [0, np.cos(phi), np.sin(phi)],
+                  [0, -np.sin(phi), np.cos(phi)]])
+    return np.dot(R, P)
+
+def R_pitch(P, theta):
+    R = np.array([[np.cos(theta), 0, -np.sin(theta)],
+                  [0, 1, 0],
+                  [np.sin(theta), 0, np.cos(theta)]])
+    return np.dot(R, P)
+
+def R_yaw(P, psi):
+    R = np.array([[np.cos(psi), np.sin(psi), 0],
+                  [-np.sin(psi), np.cos(psi), 0],
+                  [0, 0, 1]])
+    return np.dot(R, P)
+
+def Local2Inertial(P, phi, theta, psi):
+    return R_yaw(R_pitch(R_roll(P, -phi), -theta), -psi)
